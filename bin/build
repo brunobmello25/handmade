@@ -1,0 +1,8 @@
+#!/bin/bash
+
+mkdir -p ./target
+pushd ../target/
+
+c++ ../code/sdl_handmade.cpp .cpp -o handmade -g `sdl2-config --cflags --libs`
+
+popd

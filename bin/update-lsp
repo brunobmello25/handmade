@@ -1,0 +1,3 @@
+#!/bin/bash
+
+bear -- c++ ./code/sdl_handmade.cpp -o handmade -g `sdl2-config --cflags --libs`
