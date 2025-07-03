@@ -1,0 +1,25 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# indent two spaces (or whatever you like)
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+
+# Allman‐style braces
+BreakBeforeBraces: Allman
+
+# indent "case" under "switch"
+IndentCaseLabels: true
+
+# more fine-grain brace wrapping
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: true
+  AfterCaseLabel: true
+  BeforeElse: true
+  BeforeCatch: true
+
+# do NOT collapse short blocks onto one line
+AllowShortBlocksOnASingleLine: false
