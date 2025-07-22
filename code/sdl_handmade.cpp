@@ -74,8 +74,8 @@ void SDLUpdateWindow(sdl_offscreen_buffer Buffer, SDL_Window *Window,
 {
 
 	// TODO: (Bruno) Handle error
-	SDL_UpdateTexture(Buffer.Texture, NULL, Buffer.Memory,
-					  Buffer.Width * Buffer.Height);
+	int pitch = Buffer.Width * Buffer.BytesPerPixel;
+	SDL_UpdateTexture(Buffer.Texture, NULL, Buffer.Memory, pitch);
 
 	SDL_RenderCopy(Renderer, Buffer.Texture, NULL, NULL);
 
@@ -154,6 +154,7 @@ int main(int argc, char *argv[])
 			bool Running = true;
 			int Width, Height;
 			SDL_GetWindowSize(Window, &Width, &Height);
+			GlobalBackbuffer.BytesPerPixel = 4;
 			SDLResizeTexture(&GlobalBackbuffer, Renderer, Width, Height);
 
 			int XOffset = 0;
