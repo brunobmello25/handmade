@@ -2,3 +2,5 @@ target
 .cache
 .idea
 handmade
+build
+core.*
