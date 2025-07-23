@@ -47,6 +47,7 @@ internal void RenderWeirdGradient(sdl_offscreen_buffer Buffer, int XOffset,
 void SDLResizeTexture(sdl_offscreen_buffer *Buffer, SDL_Renderer *Renderer,
 					  int Width, int Height)
 {
+	Buffer->BytesPerPixel = 4;
 	if (Buffer->Memory)
 	{
 		free(Buffer->Memory);
@@ -154,7 +155,6 @@ int main(int argc, char *argv[])
 			bool Running = true;
 			int Width, Height;
 			SDL_GetWindowSize(Window, &Width, &Height);
-			GlobalBackbuffer.BytesPerPixel = 4;
 			SDLResizeTexture(&GlobalBackbuffer, Renderer, Width, Height);
 
 			int XOffset = 0;
