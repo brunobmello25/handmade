@@ -47,7 +47,6 @@ internal void RenderWeirdGradient(sdl_offscreen_buffer Buffer, int XOffset,
 void SDLResizeTexture(sdl_offscreen_buffer *Buffer, SDL_Renderer *Renderer,
 					  int Width, int Height)
 {
-	Buffer->BytesPerPixel = 4;
 	if (Buffer->Memory)
 	{
 		free(Buffer->Memory);
@@ -63,6 +62,7 @@ void SDLResizeTexture(sdl_offscreen_buffer *Buffer, SDL_Renderer *Renderer,
 						  SDL_TEXTUREACCESS_STREAMING, Width, Height);
 	Buffer->Width = Width;
 	Buffer->Height = Height;
+	Buffer->BytesPerPixel = 4;
 
 	Buffer->Memory =
 		malloc(Buffer->Width * Buffer->Height * Buffer->BytesPerPixel);
