@@ -10,6 +10,19 @@
 
 global_variable bool Running = true;
 
+struct sdl_window_dimension
+{
+	int Width;
+	int Height;
+};
+
+sdl_window_dimension SdlGetWindowDimension(SDL_Window *Window)
+{
+	sdl_window_dimension Result;
+	SDL_GetWindowSize(Window, &Result.Width, &Result.Height);
+	return Result;
+}
+
 struct sdl_offscreen_buffer
 {
 	SDL_Texture *Texture;
@@ -108,9 +121,6 @@ bool HandleEvent(SDL_Event *Event)
 
 					printf("SDL_WINDOWEVENT_SIZE_CHANGED (%d, %d)\n",
 						   Event->window.data1, Event->window.data2);
-
-					SDLResizeTexture(&GlobalBackbuffer, Renderer,
-									 Event->window.data1, Event->window.data2);
 				}
 				break;
 
@@ -154,8 +164,8 @@ int main(int argc, char *argv[])
 		{
 			bool Running = true;
 			int Width, Height;
-			SDL_GetWindowSize(Window, &Width, &Height);
-			SDLResizeTexture(&GlobalBackbuffer, Renderer, Width, Height);
+			sdl_window_dimension Dimension = SdlGetWindowDimension(Window);
+			SDLResizeTexture(&GlobalBackbuffer, Renderer, 1280, 720);
 
 			int XOffset = 0;
 			int YOffset = 0;
