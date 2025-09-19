@@ -6,10 +6,19 @@
 #define global_variable static
 #define local_persist static
 
-global_variable uint32_t *backbuffer;
-global_variable int screenWidth;
-global_variable int screenHeight;
+typedef struct
+{
+	uint32_t *pixels;
+	Image image;
+	Texture2D texture;
+	int width;
+	int height;
+} Backbuffer;
 
+// Global state
+global_variable Backbuffer globalBackbuffer;
+
+// Rendering
 void RenderWeirdGradient(uint32_t *pixels, int width, int height, int xOffset,
 						 int yOffset)
 {
@@ -27,76 +36,79 @@ void RenderWeirdGradient(uint32_t *pixels, int width, int height, int xOffset,
 	}
 }
 
-void HandleResize(Texture2D *currentTexture, Image *currentImage)
+// Backbuffer management
+void InitializeBackbuffer(Backbuffer *backbuffer, int width, int height)
 {
-	int currentWidth = GetScreenWidth();
-	int currentHeight = GetScreenHeight();
+	backbuffer->width = width;
+	backbuffer->height = height;
+	backbuffer->pixels = (uint32_t *)malloc(width * height * sizeof(uint32_t));
 
-	if (currentWidth != screenWidth || currentHeight != screenHeight)
-	{
-		screenWidth = currentWidth;
-		screenHeight = currentHeight;
-
-		if (currentTexture)
-			UnloadTexture(*currentTexture);
-		if (backbuffer)
-			free(backbuffer);
-
-		backbuffer =
-			(uint32_t *)malloc(screenWidth * screenHeight * sizeof(uint32_t));
-
-		currentImage->data = backbuffer;
-		currentImage->width = screenWidth;
-		currentImage->height = screenHeight;
-
-		*currentTexture = LoadTextureFromImage(*currentImage);
-	}
-}
-
-int main(int argc, char *argv[])
-{
-	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-	InitWindow(1280, 720, "Handmade Hero - Raylib");
-
-	screenWidth = GetScreenWidth();
-	screenHeight = GetScreenHeight();
-
-	backbuffer =
-		(uint32_t *)malloc(screenWidth * screenHeight * sizeof(uint32_t));
-
-	Image image = {
-		.data = backbuffer,
-		.width = screenWidth,
-		.height = screenHeight,
+	backbuffer->image = (Image){
+		.data = backbuffer->pixels,
+		.width = width,
+		.height = height,
 		.mipmaps = 1,
 		.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
 	};
 
-	Texture2D texture = LoadTextureFromImage(image);
+	backbuffer->texture = LoadTextureFromImage(backbuffer->image);
+}
 
+void ResizeBackbuffer(Backbuffer *backbuffer, int newWidth, int newHeight)
+{
+	if (newWidth != backbuffer->width || newHeight != backbuffer->height)
+	{
+		UnloadTexture(backbuffer->texture);
+		if (backbuffer->pixels)
+			free(backbuffer->pixels);
+
+		InitializeBackbuffer(backbuffer, newWidth, newHeight);
+	}
+}
+
+void CleanupBackbuffer(Backbuffer *backbuffer)
+{
+	UnloadTexture(backbuffer->texture);
+	if (backbuffer->pixels)
+		free(backbuffer->pixels);
+	backbuffer->pixels = NULL;
+}
+
+int main(int argc, char *argv[])
+{
+	// Initialize window
+	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+	InitWindow(1280, 720, "Handmade Hero - Raylib");
+
+	// Setup backbuffer
+	InitializeBackbuffer(&globalBackbuffer, GetScreenWidth(),
+						 GetScreenHeight());
+
+	// Animation state
 	int xOffset = 0;
 	int yOffset = 0;
 
+	// Main loop
 	while (!WindowShouldClose())
 	{
+		ResizeBackbuffer(&globalBackbuffer, GetScreenWidth(),
+						 GetScreenHeight());
 
-		HandleResize(&texture, &image);
+		RenderWeirdGradient(globalBackbuffer.pixels, globalBackbuffer.width,
+							globalBackbuffer.height, xOffset, yOffset);
 
-		RenderWeirdGradient(backbuffer, screenWidth, screenHeight, xOffset,
-							yOffset);
-
-		UpdateTexture(texture, backbuffer);
+		UpdateTexture(globalBackbuffer.texture, globalBackbuffer.pixels);
 
 		BeginDrawing();
 		ClearBackground(BLACK);
-		DrawTexture(texture, 0, 0, WHITE);
+		DrawTexture(globalBackbuffer.texture, 0, 0, WHITE);
 		EndDrawing();
 
 		++xOffset;
 	}
 
-	UnloadTexture(texture);
-	free(backbuffer);
+	// Cleanup
+	CleanupBackbuffer(&globalBackbuffer);
 	CloseWindow();
 
 	return 0;
