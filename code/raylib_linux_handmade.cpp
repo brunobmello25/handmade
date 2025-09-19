@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
 		EndDrawing();
 
 		++xOffset;
-		++yOffset;
+		yOffset += 2;
 	}
 
 	// Cleanup
