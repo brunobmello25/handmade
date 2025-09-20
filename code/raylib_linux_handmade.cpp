@@ -89,37 +89,17 @@ void CleanupBackbuffer(Backbuffer *backbuffer)
 
 void HandleInput(int gamepad)
 {
-	for (int i = 0; i < 4; i++)
-	{
-		if (IsGamepadAvailable(i))
-		{
-			printf("Gamepad %d available: %s\n", i, GetGamepadName(i));
-		}
-	}
-
-	if (!IsGamepadAvailable(gamepad))
-	{
-		printf("Gamepad %d not available\n", gamepad);
-		return;
-	}
-
-	printf("Using gamepad %d: %s\n", gamepad, GetGamepadName(gamepad));
-
-	if (IsGamepadButtonDown(gamepad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN))
-	{
-		yOffset -= 2;
-	}
 	if (IsGamepadButtonDown(gamepad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT))
 	{
 		yOffset += 2;
 	}
-	if (IsGamepadButtonDown(gamepad, GAMEPAD_BUTTON_LEFT_FACE_LEFT))
+}
+
+void PrintGamepadInfo()
+{
+	for (int i = 0; i < 4; i++)
 	{
-		xOffset -= 2;
-	}
-	if (IsGamepadButtonDown(gamepad, GAMEPAD_BUTTON_LEFT_FACE_RIGHT))
-	{
-		xOffset += 2;
+		printf("Gamepad %d available: %s\n", i, GetGamepadName(i));
 	}
 }
 
@@ -133,14 +113,11 @@ int main(int argc, char *argv[])
 	InitializeBackbuffer(&globalBackbuffer, GetScreenWidth(),
 						 GetScreenHeight());
 
+	PrintGamepadInfo();
+
 	// Main loop
 	while (!WindowShouldClose())
 	{
-		if (IsKeyPressed(KEY_LEFT) && globalGamepad > 0)
-			globalGamepad--;
-		if (IsKeyPressed(KEY_RIGHT))
-			globalGamepad++;
-
 		ResizeBackbuffer(&globalBackbuffer, GetScreenWidth(),
 						 GetScreenHeight());
 
