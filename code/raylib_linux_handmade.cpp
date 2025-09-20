@@ -7,6 +7,29 @@
 #define global_variable static
 #define local_persist static
 
+#include "handmade.cpp"
+
+/*
+	TODO(bruno): complete platform layer
+	- Saved game locations
+	- Getting a handle to our own executable file
+	- Asset loading path
+	- Threading (launch a thread)
+	- Raw input (support multiple keyboards/mice)
+	- Sleep/timeBeginPeriod (don't waste CPU time if not needed)
+	- ClipCursor (multimonitor support)
+	- Fullscreen support
+	- WM_SETCURSOR (show/hide cursor)
+	- QueryCancelAutoplay
+	- WM_ACTIVATEAPP (for when we are not the active application)
+	- Blit speed improvements (BitBlt? not sure what the raylib equivalent would
+ be, if i even need it)
+	- Hardware acceleration (OpenGL, Direct3D or both
+	- GetKeyboardLayout (for international WASD support)
+
+	Probably more stuff besides this
+ * */
+
 typedef struct
 {
 	uint32_t *pixels;
@@ -23,24 +46,6 @@ global_variable int globalGamepad = 3;
 // Animation state
 global_variable int xOffset = 0;
 global_variable int yOffset = 0;
-
-// Rendering
-void RenderWeirdGradient(uint32_t *pixels, int width, int height, int xOffset,
-						 int yOffset)
-{
-	for (int y = 0; y < height; ++y)
-	{
-		for (int x = 0; x < width; ++x)
-		{
-			uint8_t blue = (x + xOffset);
-			uint8_t green = (y + yOffset);
-			uint8_t red = 0;
-
-			uint32_t pixel = (0xFF << 24) | (blue << 16) | (green << 8) | red;
-			pixels[y * width + x] = pixel;
-		}
-	}
-}
 
 // Backbuffer management
 void InitializeBackbuffer(Backbuffer *backbuffer, int width, int height)
@@ -139,8 +144,12 @@ int main(int argc, char *argv[])
 
 		HandleInput(globalGamepad);
 
-		RenderWeirdGradient(globalBackbuffer.pixels, globalBackbuffer.width,
-							globalBackbuffer.height, xOffset, yOffset);
+		GameBackBuffer gameBackBuffer;
+		gameBackBuffer.memory = globalBackbuffer.pixels;
+		gameBackBuffer.width = globalBackbuffer.width;
+		gameBackBuffer.height = globalBackbuffer.height;
+		gameBackBuffer.pitch = globalBackbuffer.width * sizeof(uint32_t);
+		GameUpdateAndRender(&gameBackBuffer, xOffset, yOffset);
 
 		UpdateTexture(globalBackbuffer.texture, globalBackbuffer.pixels);
 
