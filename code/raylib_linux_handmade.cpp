@@ -37,6 +37,7 @@ typedef struct
 	Texture2D texture;
 	int width;
 	int height;
+	int pitch;
 } Backbuffer;
 
 // Global state
@@ -53,6 +54,7 @@ void InitializeBackbuffer(Backbuffer *backbuffer, int width, int height)
 	backbuffer->width = width;
 	backbuffer->height = height;
 	backbuffer->pixels = (uint32_t *)malloc(width * height * sizeof(uint32_t));
+	backbuffer->pitch = width * sizeof(uint32_t);
 
 	backbuffer->image = (Image){
 		.data = backbuffer->pixels,
@@ -148,7 +150,7 @@ int main(int argc, char *argv[])
 		gameBackBuffer.memory = globalBackbuffer.pixels;
 		gameBackBuffer.width = globalBackbuffer.width;
 		gameBackBuffer.height = globalBackbuffer.height;
-		gameBackBuffer.pitch = globalBackbuffer.width * sizeof(uint32_t);
+		gameBackBuffer.pitch = globalBackbuffer.pitch;
 		GameUpdateAndRender(&gameBackBuffer, xOffset, yOffset);
 
 		UpdateTexture(globalBackbuffer.texture, globalBackbuffer.pixels);
