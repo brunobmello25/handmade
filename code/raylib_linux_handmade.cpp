@@ -42,7 +42,7 @@ typedef struct
 
 // Global state
 global_variable Backbuffer globalBackbuffer;
-global_variable int globalGamepad = 3;
+global_variable int globalGamepad = 0;
 
 // Animation state
 global_variable int xOffset = 0;
@@ -89,10 +89,15 @@ void CleanupBackbuffer(Backbuffer *backbuffer)
 
 void HandleInput(int gamepad)
 {
-	if (IsGamepadButtonDown(gamepad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT))
-	{
-		yOffset += 2;
-	}
+	if (!IsGamepadAvailable(gamepad))
+		return;
+
+	float leftStickX = GetGamepadAxisMovement(gamepad, GAMEPAD_AXIS_LEFT_X);
+	float leftStickY = GetGamepadAxisMovement(gamepad, GAMEPAD_AXIS_LEFT_Y);
+
+	float sensitivity = 3.0f;
+	xOffset += (int)(leftStickX * sensitivity);
+	yOffset += (int)(leftStickY * sensitivity);
 }
 
 void PrintGamepadInfo()
@@ -136,8 +141,6 @@ int main(int argc, char *argv[])
 		ClearBackground(BLACK);
 		DrawTexture(globalBackbuffer.texture, 0, 0, WHITE);
 		EndDrawing();
-
-		++xOffset;
 	}
 
 	// Cleanup
