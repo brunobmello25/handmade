@@ -2,12 +2,13 @@
 
 set -e
 
-PLATFORM=${1:-raylib}
+PLATFORM=${1:-linux}
 
 usage() {
     echo "Usage: $0 [raylib|sdl]"
     echo "  raylib: Build with raylib (default)"
     echo "  sdl:    Build with SDL2"
+    echo "  linux:    Build with raw X11 (or wayland eventually)"
     exit 1
 }
 
@@ -15,7 +16,7 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     usage
 fi
 
-if [[ "$PLATFORM" != "raylib" && "$PLATFORM" != "sdl" ]]; then
+if [[ "$PLATFORM" != "raylib" && "$PLATFORM" != "sdl" && "$PLATFORM" != "linux" ]]; then
     echo "Error: Invalid platform '$PLATFORM'"
     usage
 fi
@@ -33,6 +34,10 @@ case $PLATFORM in
     "sdl")
         echo "Compiling SDL version..."
         bear -- c++ ../code/sdl_handmade.cpp -o handmade -g `sdl2-config --cflags --libs`
+        ;;
+    "linux")
+        echo "Compiling raw X11 version..."
+        bear -- c++ ../code/linux_handmade.cpp -o handmade -lX11
         ;;
 esac
 
