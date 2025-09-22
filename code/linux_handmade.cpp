@@ -20,6 +20,8 @@ struct Backbuffer
 	int screen;
 	Window win;
 	GC gc;
+
+	int width, height;
 };
 
 global_variable Backbuffer globalBackbuffer;
@@ -39,13 +41,12 @@ void init_x(Backbuffer *backbuffer)
 		white = WhitePixel(backbuffer->dis,
 						   backbuffer->screen); /* get color white */
 
-	/* once the display is initialized, create the window.
-	   This window will be have be 200 pixels across and 300 down.
-	   It will have the foreground white and background black
-	*/
-	backbuffer->win =
-		XCreateSimpleWindow(backbuffer->dis, DefaultRootWindow(backbuffer->dis),
-							0, 0, 200, 300, 5, white, black);
+	backbuffer->width = 640;
+	backbuffer->height = 480;
+
+	backbuffer->win = XCreateSimpleWindow(
+		backbuffer->dis, DefaultRootWindow(backbuffer->dis), 0, 0,
+		backbuffer->width, backbuffer->height, 5, white, black);
 
 	/* here is where some properties of the window can be set.
 	   The third and fourth items indicate the name which appears
@@ -59,7 +60,8 @@ void init_x(Backbuffer *backbuffer)
 	   the input.  see the appropriate section for details...
 	*/
 	XSelectInput(backbuffer->dis, backbuffer->win,
-				 ExposureMask | ButtonPressMask | KeyPressMask);
+				 ExposureMask | ButtonPressMask | KeyPressMask |
+					 ResizeRedirectMask);
 
 	/* create the Graphics Context */
 	backbuffer->gc = XCreateGC(backbuffer->dis, backbuffer->win, 0, 0);
@@ -74,6 +76,13 @@ void init_x(Backbuffer *backbuffer)
 	XClearWindow(backbuffer->dis, backbuffer->win);
 	XMapRaised(backbuffer->dis, backbuffer->win);
 };
+
+internal void ResizeBackbuffer(Backbuffer *buffer, int width, int height)
+{
+	buffer->width = width;
+	buffer->height = height;
+	XResizeWindow(buffer->dis, buffer->win, width, height);
+}
 
 int main(void)
 {
@@ -97,6 +106,11 @@ int main(void)
 		{
 			if (eventMsg[0] == 'q')
 				break;
+		}
+		if (event.type == ResizeRequest)
+		{
+			ResizeBackbuffer(&globalBackbuffer, event.xresizerequest.width,
+							 event.xresizerequest.height);
 		}
 	}
 
