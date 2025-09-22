@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// TODO(bruno): maybe go through this file replacing malloc with the proper
+// syscall for this platform. maybe see the "allocating a backbuffer" episode of
+// handmadehero to see how he does it on windows and replicate it over here.
+
 #define internal static
 #define global_variable static
 #define local_persist static
@@ -20,13 +24,13 @@ struct Backbuffer
 	int screen;
 	Window win;
 	GC gc;
-
 	int width, height;
+	uint32_t *pixels;
 };
 
 global_variable Backbuffer globalBackbuffer;
 
-void init_x(Backbuffer *backbuffer)
+void InitializeBackbuffer(Backbuffer *backbuffer)
 {
 	/* get the colors black and white (see section for details) */
 	unsigned long black, white;
@@ -43,6 +47,8 @@ void init_x(Backbuffer *backbuffer)
 
 	backbuffer->width = 640;
 	backbuffer->height = 480;
+	backbuffer->pixels = (uint32_t *)malloc(
+		backbuffer->width * backbuffer->height * sizeof(uint32_t));
 
 	backbuffer->win = XCreateSimpleWindow(
 		backbuffer->dis, DefaultRootWindow(backbuffer->dis), 0, 0,
@@ -79,14 +85,23 @@ void init_x(Backbuffer *backbuffer)
 
 internal void ResizeBackbuffer(Backbuffer *buffer, int width, int height)
 {
+	printf("Resizing to %dx%d\n", width, height);
 	buffer->width = width;
 	buffer->height = height;
+
+	if (buffer->pixels)
+	{
+		free(buffer->pixels);
+	};
+
+	buffer->pixels = (uint32_t *)malloc(width * height * sizeof(uint32_t));
+
 	XResizeWindow(buffer->dis, buffer->win, width, height);
 }
 
 int main(void)
 {
-	init_x(&globalBackbuffer);
+	InitializeBackbuffer(&globalBackbuffer);
 
 	XEvent event;
 	KeySym key;
@@ -97,7 +112,6 @@ int main(void)
 		XNextEvent(globalBackbuffer.dis, &event);
 		if (event.type == Expose && event.xexpose.count == 0)
 		{
-
 			// TODO(bruno): redraw
 		}
 		if (event.type == KeyPress &&
