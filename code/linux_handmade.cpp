@@ -1,8 +1,15 @@
 #include <X11/Xlib.h>
 #include <X11/Xos.h>
 #include <X11/Xutil.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#define internal static
+#define global_variable static
+#define local_persist static
+
+#include "handmade.cpp"
 
 Display *dis;
 int screen;
@@ -35,7 +42,8 @@ void init_x()
 	   at the top of the window and the name of the minimized window
 	   respectively.
 	*/
-	XSetStandardProperties(dis, win, "My Window", "HI!", None, NULL, 0, NULL);
+	XSetStandardProperties(dis, win, "Handmade Hero", "HI!", None, NULL, 0,
+						   NULL);
 
 	/* this routine determines which types of input are allowed in
 	   the input.  see the appropriate section for details...
@@ -60,11 +68,10 @@ int main(void)
 {
 	init_x();
 
-	char tmp[512];
-	while (True)
+	XEvent event;
+
+	while (1)
 	{
-		scanf("%s", tmp);
-		printf("%s", tmp);
 	}
 
 	return 0;
