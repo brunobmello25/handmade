@@ -1,3 +1,4 @@
+#include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xos.h>
 #include <X11/Xutil.h>
@@ -8,6 +9,8 @@
 #define internal static
 #define global_variable static
 #define local_persist static
+
+#define X_EVENT_BUFFER_SIZE 255
 
 #include "handmade.cpp"
 
@@ -26,7 +29,6 @@ void init_x()
 	*/
 	dis = XOpenDisplay((char *)0);
 	screen = DefaultScreen(dis);
-	printf("screen is %d\n", screen);
 	black = BlackPixel(dis, screen),	 /* get color black */
 		white = WhitePixel(dis, screen); /* get color white */
 
@@ -69,9 +71,24 @@ int main(void)
 	init_x();
 
 	XEvent event;
+	KeySym key;
+	char eventMsg[X_EVENT_BUFFER_SIZE];
 
 	while (1)
 	{
+		XNextEvent(dis, &event);
+		if (event.type == Expose && event.xexpose.count == 0)
+		{
+
+			// TODO(bruno): redraw
+		}
+		if (event.type == KeyPress &&
+			XLookupString(&event.xkey, eventMsg, X_EVENT_BUFFER_SIZE, &key,
+						  NULL) == 1)
+		{
+			if (eventMsg[0] == 'q')
+				break;
+		}
 	}
 
 	return 0;
