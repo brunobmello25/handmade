@@ -14,12 +14,17 @@
 
 #include "handmade.cpp"
 
-Display *dis;
-int screen;
-Window win;
-GC gc;
+struct Backbuffer
+{
+	Display *dis;
+	int screen;
+	Window win;
+	GC gc;
+};
 
-void init_x()
+global_variable Backbuffer globalBackbuffer;
+
+void init_x(Backbuffer *backbuffer)
 {
 	/* get the colors black and white (see section for details) */
 	unsigned long black, white;
@@ -27,48 +32,52 @@ void init_x()
 	/* use the information from the environment variable DISPLAY
 	   to create the X connection:
 	*/
-	dis = XOpenDisplay((char *)0);
-	screen = DefaultScreen(dis);
-	black = BlackPixel(dis, screen),	 /* get color black */
-		white = WhitePixel(dis, screen); /* get color white */
+	backbuffer->dis = XOpenDisplay((char *)0);
+	backbuffer->screen = DefaultScreen(backbuffer->dis);
+	black =
+		BlackPixel(backbuffer->dis, backbuffer->screen), /* get color black */
+		white = WhitePixel(backbuffer->dis,
+						   backbuffer->screen); /* get color white */
 
 	/* once the display is initialized, create the window.
 	   This window will be have be 200 pixels across and 300 down.
 	   It will have the foreground white and background black
 	*/
-	win = XCreateSimpleWindow(dis, DefaultRootWindow(dis), 0, 0, 200, 300, 5,
-							  white, black);
+	backbuffer->win =
+		XCreateSimpleWindow(backbuffer->dis, DefaultRootWindow(backbuffer->dis),
+							0, 0, 200, 300, 5, white, black);
 
 	/* here is where some properties of the window can be set.
 	   The third and fourth items indicate the name which appears
 	   at the top of the window and the name of the minimized window
 	   respectively.
 	*/
-	XSetStandardProperties(dis, win, "Handmade Hero", "HI!", None, NULL, 0,
-						   NULL);
+	XSetStandardProperties(backbuffer->dis, backbuffer->win, "Handmade Hero",
+						   "HI!", None, NULL, 0, NULL);
 
 	/* this routine determines which types of input are allowed in
 	   the input.  see the appropriate section for details...
 	*/
-	XSelectInput(dis, win, ExposureMask | ButtonPressMask | KeyPressMask);
+	XSelectInput(backbuffer->dis, backbuffer->win,
+				 ExposureMask | ButtonPressMask | KeyPressMask);
 
 	/* create the Graphics Context */
-	gc = XCreateGC(dis, win, 0, 0);
+	backbuffer->gc = XCreateGC(backbuffer->dis, backbuffer->win, 0, 0);
 
 	/* here is another routine to set the foreground and background
 	   colors _currently_ in use in the window.
 	*/
-	XSetBackground(dis, gc, white);
-	XSetForeground(dis, gc, black);
+	XSetBackground(backbuffer->dis, backbuffer->gc, white);
+	XSetForeground(backbuffer->dis, backbuffer->gc, black);
 
 	/* clear the window and bring it on top of the other windows */
-	XClearWindow(dis, win);
-	XMapRaised(dis, win);
+	XClearWindow(backbuffer->dis, backbuffer->win);
+	XMapRaised(backbuffer->dis, backbuffer->win);
 };
 
 int main(void)
 {
-	init_x();
+	init_x(&globalBackbuffer);
 
 	XEvent event;
 	KeySym key;
@@ -76,7 +85,7 @@ int main(void)
 
 	while (1)
 	{
-		XNextEvent(dis, &event);
+		XNextEvent(globalBackbuffer.dis, &event);
 		if (event.type == Expose && event.xexpose.count == 0)
 		{
 
