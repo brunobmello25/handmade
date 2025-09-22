@@ -45,8 +45,8 @@ void InitializeBackbuffer(Backbuffer *backbuffer)
 		white = WhitePixel(backbuffer->dis,
 						   backbuffer->screen); /* get color white */
 
-	backbuffer->width = 640;
-	backbuffer->height = 480;
+	backbuffer->width = 1280;
+	backbuffer->height = 720;
 	backbuffer->pixels = (uint32_t *)malloc(
 		backbuffer->width * backbuffer->height * sizeof(uint32_t));
 
