@@ -32,6 +32,11 @@ struct Backbuffer
 
 global_variable Backbuffer globalBackbuffer;
 
+global_variable int xOffset = 0;
+global_variable int yOffset = 0;
+
+global_variable bool isRunning = true;
+
 void InitializeX11(Backbuffer *backbuffer)
 {
 	/* get the colors black and white (see section for details) */
@@ -121,35 +126,41 @@ int main(void)
 	KeySym key;
 	char eventMsg[X_EVENT_BUFFER_SIZE];
 
-	while (1)
+	while (isRunning)
 	{
-		XNextEvent(globalBackbuffer.dis, &event);
-		if (event.type == Expose && event.xexpose.count == 0)
+		// Process all pending events
+		while (XPending(globalBackbuffer.dis))
 		{
-			GameBackBuffer gamebackbuffer;
-			gamebackbuffer.width = globalBackbuffer.width;
-			gamebackbuffer.height = globalBackbuffer.height;
-			gamebackbuffer.pitch = globalBackbuffer.pitch;
-			gamebackbuffer.memory = (uint32_t *)globalBackbuffer.ximage->data;
-			GameUpdateAndRender(&gamebackbuffer, 0, 0);
+			XNextEvent(globalBackbuffer.dis, &event);
+			if (event.type == KeyPress &&
+				XLookupString(&event.xkey, eventMsg, X_EVENT_BUFFER_SIZE, &key,
+							  NULL) == 1)
+			{
+				if (eventMsg[0] == 'q')
+					isRunning = false;
+			}
+			if (event.type == ConfigureNotify)
+			{
+				ResizeBackbuffer(&globalBackbuffer, event.xconfigure.width,
+								 event.xconfigure.height);
+			}
+		}
 
-			XPutImage(globalBackbuffer.dis, globalBackbuffer.win,
-					  globalBackbuffer.gc, globalBackbuffer.ximage, 0, 0, 0, 0,
-					  globalBackbuffer.width, globalBackbuffer.height);
-			// TODO(bruno): redraw
-		}
-		if (event.type == KeyPress &&
-			XLookupString(&event.xkey, eventMsg, X_EVENT_BUFFER_SIZE, &key,
-						  NULL) == 1)
-		{
-			if (eventMsg[0] == 'q')
-				break;
-		}
-		if (event.type == ConfigureNotify)
-		{
-			ResizeBackbuffer(&globalBackbuffer, event.xconfigure.width,
-							 event.xconfigure.height);
-		}
+		// Render every frame
+		GameBackBuffer gamebackbuffer;
+		gamebackbuffer.width = globalBackbuffer.width;
+		gamebackbuffer.height = globalBackbuffer.height;
+		gamebackbuffer.pitch = globalBackbuffer.pitch;
+		gamebackbuffer.memory = (uint32_t *)globalBackbuffer.ximage->data;
+		GameUpdateAndRender(&gamebackbuffer, xOffset, yOffset);
+
+		XPutImage(globalBackbuffer.dis, globalBackbuffer.win,
+				  globalBackbuffer.gc, globalBackbuffer.ximage, 0, 0, 0, 0,
+				  globalBackbuffer.width, globalBackbuffer.height);
+		XFlush(globalBackbuffer.dis);
+
+		xOffset++;
+		yOffset++;
 	}
 
 	return 0;
