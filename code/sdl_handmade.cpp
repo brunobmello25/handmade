@@ -1,3 +1,5 @@
+#include "SDL_events.h"
+#include "SDL_keycode.h"
 #include <SDL.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -45,6 +47,7 @@ global_variable Backbuffer globalBackbuffer;
 
 #define MAX_CONTROLLERS 4
 SDL_GameController *ControllerHandles[MAX_CONTROLLERS];
+SDL_Haptic *RumbleHandles[MAX_CONTROLLERS];
 
 WindowDimension GetWindowDimension(SDL_Window *window)
 {
@@ -151,11 +154,28 @@ bool HandleEvent(SDL_Event *event)
 			}
 		}
 		break;
+
+		case SDL_KEYDOWN:
+		case SDL_KEYUP:
+		{
+			SDL_Keycode keycode = event->key.keysym.sym;
+			bool wasDown = false;
+			if (event->key.state == SDL_RELEASED)
+				wasDown = true;
+			else if (event->key.repeat != 0)
+				wasDown = true;
+			if (keycode == SDLK_w)
+				printf("w\n");
+		};
+		break;
 	}
 
 	return (shouldQuit);
 }
 
+// TODO(bruno): maybe we should close the controllers and rumble handles on
+// exit. or maybe not, since the OS should take care of that when the process
+// ends.
 void InitializeControllers()
 {
 
@@ -169,14 +189,23 @@ void InitializeControllers()
 		if (controllerIndex >= MAX_CONTROLLERS)
 			break;
 
-		ControllerHandles[controllerIndex] =
-			SDL_GameControllerOpen(joystickIndex);
+		SDL_GameController *controller = SDL_GameControllerOpen(joystickIndex);
+		ControllerHandles[controllerIndex] = controller;
+
+		SDL_Joystick *joystick = SDL_GameControllerGetJoystick(controller);
+		SDL_Haptic *haptic = SDL_HapticOpenFromJoystick(joystick);
+		RumbleHandles[controllerIndex] = haptic;
+		if (haptic && SDL_HapticRumbleInit(haptic) != 0)
+		{
+			SDL_HapticClose(haptic);
+			RumbleHandles[controllerIndex] = NULL;
+		}
 	}
 }
 
 int main(int argc, char *argv[])
 {
-	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
+	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC);
 
 	SDL_Window *window = SDL_CreateWindow(
 		"Handmade Hero", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640,
@@ -247,6 +276,11 @@ int main(int argc, char *argv[])
 						if (aButton)
 						{
 							yOffset += 2;
+						}
+						SDL_Haptic *haptic = RumbleHandles[controllerIndex];
+						if (bButton && haptic)
+						{
+							SDL_HapticRumblePlay(haptic, 0.5f, 2000);
 						}
 					}
 				}
