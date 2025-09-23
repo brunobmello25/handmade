@@ -32,7 +32,7 @@ struct Backbuffer
 
 global_variable Backbuffer globalBackbuffer;
 
-void InitializeBackbuffer(Backbuffer *backbuffer)
+void InitializeX11(Backbuffer *backbuffer)
 {
 	/* get the colors black and white (see section for details) */
 	unsigned long black, white;
@@ -85,7 +85,10 @@ void InitializeBackbuffer(Backbuffer *backbuffer)
 	/* clear the window and bring it on top of the other windows */
 	XClearWindow(backbuffer->dis, backbuffer->win);
 	XMapRaised(backbuffer->dis, backbuffer->win);
+}
 
+void InitializeBackbuffer(Backbuffer *backbuffer)
+{
 	void *imagedata =
 		malloc(backbuffer->width * backbuffer->height * sizeof(uint32_t));
 
@@ -97,28 +100,21 @@ void InitializeBackbuffer(Backbuffer *backbuffer)
 
 internal void ResizeBackbuffer(Backbuffer *buffer, int width, int height)
 {
-	printf("Resizing to %dx%d\n", width, height);
 	buffer->width = width;
 	buffer->height = height;
 	buffer->pitch = buffer->width * sizeof(uint32_t);
 
 	if (buffer->ximage)
 	{
-		printf("Destroying old ximage\n");
 		XDestroyImage(buffer->ximage);
 	}
 
-	printf("Allocating new pixels\n");
-	void *imagedata = malloc(width * height * sizeof(uint32_t));
-
-	printf("Creating new ximage\n");
-	buffer->ximage = XCreateImage(
-		buffer->dis, DefaultVisual(buffer->dis, buffer->screen), 24, ZPixmap, 0,
-		(char *)imagedata, buffer->width, buffer->height, 32, buffer->pitch);
+	InitializeBackbuffer(buffer);
 }
 
 int main(void)
 {
+	InitializeX11(&globalBackbuffer);
 	InitializeBackbuffer(&globalBackbuffer);
 
 	XEvent event;
