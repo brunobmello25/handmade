@@ -43,6 +43,9 @@ struct WindowDimension
 
 global_variable Backbuffer globalBackbuffer;
 
+#define MAX_CONTROLLERS 4
+SDL_GameController *ControllerHandles[MAX_CONTROLLERS];
+
 WindowDimension GetWindowDimension(SDL_Window *window)
 {
 	WindowDimension result;
@@ -153,15 +156,35 @@ bool HandleEvent(SDL_Event *event)
 	return (shouldQuit);
 }
 
+void InitializeControllers()
+{
+
+	int maxJoysticks = SDL_NumJoysticks();
+	int controllerIndex = 0;
+	for (int joystickIndex = 0; joystickIndex < maxJoysticks; joystickIndex++)
+	{
+		if (!SDL_IsGameController(joystickIndex))
+			continue;
+
+		if (controllerIndex >= MAX_CONTROLLERS)
+			break;
+
+		ControllerHandles[controllerIndex] =
+			SDL_GameControllerOpen(joystickIndex);
+	}
+}
+
 int main(int argc, char *argv[])
 {
-	SDL_Init(SDL_INIT_VIDEO);
+	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
 
 	SDL_Window *window = SDL_CreateWindow(
 		"Handmade Hero", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640,
 		480, SDL_WINDOW_RESIZABLE);
 	if (window)
 	{
+		InitializeControllers();
+
 		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 		if (renderer)
 		{
@@ -181,11 +204,57 @@ int main(int argc, char *argv[])
 						running = false;
 					}
 				}
+
+				for (int controllerIndex = 0; controllerIndex < MAX_CONTROLLERS;
+					 controllerIndex++)
+				{
+					SDL_GameController *controller =
+						ControllerHandles[controllerIndex];
+
+					if (controller != NULL &&
+						SDL_GameControllerGetAttached(controller))
+					{
+						bool up = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
+						bool down = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+						bool left = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+						bool right = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+						bool start = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_START);
+						bool back = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_BACK);
+						bool leftShoulder = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+						bool rightShoulder = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+						bool aButton = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_A);
+						bool bButton = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_B);
+						bool xButton = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_X);
+						bool yButton = SDL_GameControllerGetButton(
+							controller, SDL_CONTROLLER_BUTTON_Y);
+
+						int16 stickX = SDL_GameControllerGetAxis(
+							controller, SDL_CONTROLLER_AXIS_LEFTX);
+						int16 stickY = SDL_GameControllerGetAxis(
+							controller, SDL_CONTROLLER_AXIS_LEFTY);
+
+						if (aButton)
+						{
+							yOffset += 2;
+						}
+					}
+				}
+
 				RenderWeirdGradient(globalBackbuffer, xOffset, yOffset);
 				SDLUpdateWindow(window, renderer, globalBackbuffer);
 
 				++xOffset;
-				yOffset += 2;
 			}
 		}
 		else
