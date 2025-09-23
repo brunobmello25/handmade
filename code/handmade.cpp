@@ -1,21 +1,24 @@
 #include "handmade.h"
 
 // Rendering
-internal void RenderWeirdGradient(GameBackBuffer *backBuffer, int blueOffset,
-								  int greenOffset)
+internal void RenderWeirdGradient(GameBackBuffer *backbuffer, int BlueOffset,
+								  int GreenOffset)
 {
-	uint8_t *row = (uint8_t *)backBuffer->memory;
-	for (int y = 0; y < backBuffer->height; y++)
-	{
-		uint32_t *pixel = (uint32_t *)row;
-		for (int x = 0; x < backBuffer->width; x++)
-		{
-			uint8_t blue = (x + blueOffset);
-			uint8_t green = (y + greenOffset);
+	uint8_t *Row = (uint8_t *)backbuffer->memory;
 
-			*pixel++ = (0xFF << 24) | (blue << 16) | (green << 8) | 0;
+	for (int Y = 0; Y < backbuffer->height; Y++)
+	{
+		uint32_t *Pixel = (uint32_t *)Row;
+		for (int X = 0; X < backbuffer->width; X++)
+		{
+			// Memory Order: BB GG RR XX
+			// 0xXXBBGGRR
+			uint8_t Blue = X + BlueOffset;
+			uint8_t Green = Y + GreenOffset;
+
+			*Pixel++ = ((Green << 8) | Blue);
 		}
-		row += backBuffer->pitch;
+		Row += backbuffer->pitch;
 	}
 }
 
