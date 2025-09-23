@@ -1,5 +1,7 @@
 #include <SDL.h>
 #include <SDL_audio.h>
+#include <cstdlib>
+#include <cstring>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -39,6 +41,14 @@ struct Backbuffer
 	int pitch;
 };
 
+struct AudioRingBuffer
+{
+	int size;
+	int writeCursor;
+	int playCursor;
+	void *data;
+};
+
 struct WindowDimension
 {
 	int width;
@@ -46,6 +56,7 @@ struct WindowDimension
 };
 
 global_variable Backbuffer globalBackbuffer;
+global_variable AudioRingBuffer globalAudioRingBuffer;
 
 #define MAX_CONTROLLERS 4
 SDL_GameController *ControllerHandles[MAX_CONTROLLERS];
@@ -204,25 +215,51 @@ void InitializeControllers()
 
 internal void SDLAudioCallback(void *userdata, Uint8 *AudioData, int length)
 {
-	memset(AudioData, 0, length);
+	AudioRingBuffer *ringbuffer = (AudioRingBuffer *)userdata;
+
+	int region1size = length;
+	int region2size = 0;
+	if (ringbuffer->playCursor + length > ringbuffer->size)
+	{
+		region1size = ringbuffer->size - ringbuffer->playCursor;
+		region2size = length - region1size;
+	}
+
+	memcpy(AudioData, (uint8 *)(ringbuffer->data) + ringbuffer->playCursor,
+		   region1size);
+	memcpy(&AudioData[region1size], ringbuffer->data, region2size);
+	ringbuffer->playCursor =
+		(ringbuffer->playCursor + length) % ringbuffer->size;
+	ringbuffer->writeCursor =
+		(ringbuffer->playCursor + 2048) % ringbuffer->size;
 }
 
-internal void InitializeAudio(int32 samplesPerSecond, int32 bufferSize)
+internal void InitializeAudio(int32 sampleRate, int32 bufferSize)
 {
 
 	SDL_AudioSpec audioSettings = {0};
 	// TODO(bruno): maybe extract these to globals?
-	audioSettings.freq = samplesPerSecond;
+	audioSettings.freq = sampleRate;
 	audioSettings.format = AUDIO_S16LSB;
 	audioSettings.channels = 2;
 	audioSettings.samples = 1024;
 	audioSettings.callback = &SDLAudioCallback;
+	audioSettings.userdata = &globalAudioRingBuffer;
+
+	globalAudioRingBuffer.size = bufferSize;
+	globalAudioRingBuffer.data = malloc(bufferSize);
+	globalAudioRingBuffer.playCursor = globalAudioRingBuffer.writeCursor = 0;
 
 	SDL_OpenAudio(&audioSettings, NULL);
 
+	printf("Initialised an Audio device at frequency %d Hz, %d Channels, "
+		   "buffer size %d\n",
+		   audioSettings.freq, audioSettings.channels, audioSettings.samples);
+
 	if (audioSettings.format != AUDIO_S16LSB)
 	{
-		// TODO(bruno): complain we didn't get the format we wanted.
+		printf("Didn't get AUDIO_S16LSB as sample format!\n");
+		SDL_CloseAudio();
 	}
 }
 
@@ -248,18 +285,21 @@ int main(int argc, char *argv[])
 			int xOffset = 0;
 			int yOffset = 0;
 
-			int samplesPerSecond = 48000;
+			int sampleRate = 48000;
 			int toneHz = 256;
 			int16 toneVolume = 3000;
 			uint32 runningSampleIndex = 0;
-			int squareWavePeriod = samplesPerSecond / toneHz;
+			int squareWavePeriod = sampleRate / toneHz;
 			int halfSquareWavePeriod = squareWavePeriod / 2;
 			int bytesPerSample = sizeof(int16) * 2;
+			int secondaryBufferSize = sampleRate * bytesPerSample;
 			// TODO(bruno): samplespersecond/60 because we want to write 800
 			// frame. but this calculation probably shouldn't be here.
-			int bytesToWrite = 800 * bytesPerSample;
 
-			InitializeAudio(samplesPerSecond, bytesToWrite);
+			// int targetQueueBytes = sampleRate * bytesPerSample;
+			// int bytesToWrite = targetQueueBytes - SDL_GetQueuedAudioSize(1);
+
+			InitializeAudio(sampleRate, secondaryBufferSize);
 			bool soundPlaying = false;
 
 			while (running)
@@ -271,30 +311,6 @@ int main(int argc, char *argv[])
 					{
 						running = false;
 					}
-				}
-
-				void *soundBuffer = malloc(bytesToWrite);
-				int16 *sampleOut = (int16 *)soundBuffer;
-				int sampleCount = bytesToWrite / bytesPerSample;
-
-				// TODO(bruno): understand what the hell is going on here.
-				for (int sampleIndex = 0; sampleIndex < sampleCount;
-					 ++sampleIndex)
-				{
-					int16 sampleValue =
-						((runningSampleIndex++ / halfSquareWavePeriod) % 2)
-							? toneVolume
-							: -toneVolume;
-					*sampleOut++ = sampleValue;
-					*sampleOut++ = sampleValue;
-				}
-				SDL_QueueAudio(1, soundBuffer, bytesToWrite);
-				free(soundBuffer);
-
-				if (!soundPlaying)
-				{
-					SDL_PauseAudio(false);
-					soundPlaying = true;
 				}
 
 				for (int controllerIndex = 0; controllerIndex < MAX_CONTROLLERS;
@@ -349,6 +365,68 @@ int main(int argc, char *argv[])
 				}
 
 				RenderWeirdGradient(globalBackbuffer, xOffset, yOffset);
+
+				SDL_LockAudio();
+				// TODO(bruno): what in the actual skibidi whippy flying fuck
+				// is happening here
+				int byteToLock =
+					runningSampleIndex * bytesPerSample % secondaryBufferSize;
+				int bytesToWrite;
+				if (byteToLock == globalAudioRingBuffer.playCursor)
+				{
+					bytesToWrite = secondaryBufferSize;
+				}
+				else if (byteToLock > globalAudioRingBuffer.playCursor)
+				{
+					bytesToWrite = (secondaryBufferSize - byteToLock);
+					bytesToWrite += globalAudioRingBuffer.playCursor;
+				}
+				else
+				{
+					bytesToWrite =
+						globalAudioRingBuffer.playCursor - byteToLock;
+				}
+
+				void *region1 =
+					(uint8 *)globalAudioRingBuffer.data + byteToLock;
+				int region1Size = bytesToWrite;
+				if (region1Size + byteToLock > secondaryBufferSize)
+					region1Size = secondaryBufferSize - byteToLock;
+				void *Region2 = globalAudioRingBuffer.data;
+				int Region2Size = bytesToWrite - region1Size;
+				SDL_UnlockAudio();
+				int Region1SampleCount = region1Size / bytesPerSample;
+				int16 *SampleOut = (int16 *)region1;
+				for (int SampleIndex = 0; SampleIndex < Region1SampleCount;
+					 ++SampleIndex)
+				{
+					int16 SampleValue =
+						((runningSampleIndex++ / halfSquareWavePeriod) % 2)
+							? toneVolume
+							: -toneVolume;
+					*SampleOut++ = SampleValue;
+					*SampleOut++ = SampleValue;
+				}
+
+				int Region2SampleCount = Region2Size / bytesPerSample;
+				SampleOut = (int16 *)Region2;
+				for (int SampleIndex = 0; SampleIndex < Region2SampleCount;
+					 ++SampleIndex)
+				{
+					int16 SampleValue =
+						((runningSampleIndex++ / halfSquareWavePeriod) % 2)
+							? toneVolume
+							: -toneVolume;
+					*SampleOut++ = SampleValue;
+					*SampleOut++ = SampleValue;
+				}
+
+				if (!soundPlaying)
+				{
+					SDL_PauseAudio(0);
+					soundPlaying = true;
+				}
+
 				SDLUpdateWindow(window, renderer, globalBackbuffer);
 
 				++xOffset;
