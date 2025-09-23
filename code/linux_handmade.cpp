@@ -2,6 +2,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xos.h>
 #include <X11/Xutil.h>
+#include <cstdint>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,7 +26,6 @@ struct Backbuffer
 	Window win;
 	GC gc;
 	int width, height;
-	uint32_t *pixels;
 	int pitch;
 	XImage *ximage;
 };
@@ -50,8 +50,6 @@ void InitializeBackbuffer(Backbuffer *backbuffer)
 	backbuffer->width = 1280;
 	backbuffer->height = 720;
 	backbuffer->pitch = backbuffer->width * sizeof(uint32_t);
-	backbuffer->pixels = (uint32_t *)malloc(
-		backbuffer->width * backbuffer->height * sizeof(uint32_t));
 
 	backbuffer->win = XCreateSimpleWindow(
 		backbuffer->dis, DefaultRootWindow(backbuffer->dis), 0, 0,
@@ -68,9 +66,12 @@ void InitializeBackbuffer(Backbuffer *backbuffer)
 	/* this routine determines which types of input are allowed in
 	   the input.  see the appropriate section for details...
 	*/
-	XSelectInput(backbuffer->dis, backbuffer->win,
-				 ExposureMask | ButtonPressMask | KeyPressMask |
-					 ResizeRedirectMask);
+	XSelectInput(
+		backbuffer->dis, backbuffer->win,
+		ExposureMask | ButtonPressMask | KeyPressMask |
+			StructureNotifyMask); // TODO(bruno): figure out why we couldn't use
+								  // `ResizeRedirectMask` and had to switch to
+								  // `StructureNotifyMask`
 
 	/* create the Graphics Context */
 	backbuffer->gc = XCreateGC(backbuffer->dis, backbuffer->win, 0, 0);
@@ -85,10 +86,13 @@ void InitializeBackbuffer(Backbuffer *backbuffer)
 	XClearWindow(backbuffer->dis, backbuffer->win);
 	XMapRaised(backbuffer->dis, backbuffer->win);
 
+	void *imagedata =
+		malloc(backbuffer->width * backbuffer->height * sizeof(uint32_t));
+
 	backbuffer->ximage = XCreateImage(
 		backbuffer->dis, DefaultVisual(backbuffer->dis, backbuffer->screen), 24,
-		ZPixmap, 0, (char *)backbuffer->pixels, backbuffer->width,
-		backbuffer->height, 32, backbuffer->pitch);
+		ZPixmap, 0, (char *)imagedata, backbuffer->width, backbuffer->height,
+		32, backbuffer->pitch);
 };
 
 internal void ResizeBackbuffer(Backbuffer *buffer, int width, int height)
@@ -98,29 +102,19 @@ internal void ResizeBackbuffer(Backbuffer *buffer, int width, int height)
 	buffer->height = height;
 	buffer->pitch = buffer->width * sizeof(uint32_t);
 
-	if (buffer->pixels)
-	{
-		printf("Freeing old pixels\n");
-		free(buffer->pixels);
-	};
-
-	printf("Allocating new pixels\n");
-	buffer->pixels = (uint32_t *)malloc(width * height * sizeof(uint32_t));
-
-	printf("Resizing window\n");
-	XResizeWindow(buffer->dis, buffer->win, width, height);
-
 	if (buffer->ximage)
 	{
 		printf("Destroying old ximage\n");
 		XDestroyImage(buffer->ximage);
 	}
 
+	printf("Allocating new pixels\n");
+	void *imagedata = malloc(width * height * sizeof(uint32_t));
+
 	printf("Creating new ximage\n");
-	buffer->ximage =
-		XCreateImage(buffer->dis, DefaultVisual(buffer->dis, buffer->screen),
-					 24, ZPixmap, 0, (char *)buffer->pixels, buffer->width,
-					 buffer->height, 32, buffer->pitch);
+	buffer->ximage = XCreateImage(
+		buffer->dis, DefaultVisual(buffer->dis, buffer->screen), 24, ZPixmap, 0,
+		(char *)imagedata, buffer->width, buffer->height, 32, buffer->pitch);
 }
 
 int main(void)
@@ -139,8 +133,8 @@ int main(void)
 			GameBackBuffer gamebackbuffer;
 			gamebackbuffer.width = globalBackbuffer.width;
 			gamebackbuffer.height = globalBackbuffer.height;
-			gamebackbuffer.memory = globalBackbuffer.pixels;
 			gamebackbuffer.pitch = globalBackbuffer.pitch;
+			gamebackbuffer.memory = (uint32_t *)globalBackbuffer.ximage->data;
 			GameUpdateAndRender(&gamebackbuffer, 0, 0);
 
 			XPutImage(globalBackbuffer.dis, globalBackbuffer.win,
@@ -155,10 +149,10 @@ int main(void)
 			if (eventMsg[0] == 'q')
 				break;
 		}
-		if (event.type == ResizeRequest)
+		if (event.type == ConfigureNotify)
 		{
-			ResizeBackbuffer(&globalBackbuffer, event.xresizerequest.width,
-							 event.xresizerequest.height);
+			ResizeBackbuffer(&globalBackbuffer, event.xconfigure.width,
+							 event.xconfigure.height);
 		}
 	}
 
