@@ -1,9 +1,11 @@
-#include "SDL_events.h"
-#include "SDL_keycode.h"
 #include <SDL.h>
+#include <SDL_audio.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/mman.h>
+
+// TODO(bruno): estudar mmap
 
 // NOTE: MAP_ANONYMOUS is not defined on Mac OS X and some other UNIX systems.
 // On the vast majority of those systems, one can use MAP_ANON instead.
@@ -173,9 +175,6 @@ bool HandleEvent(SDL_Event *event)
 	return (shouldQuit);
 }
 
-// TODO(bruno): maybe we should close the controllers and rumble handles on
-// exit. or maybe not, since the OS should take care of that when the process
-// ends.
 void InitializeControllers()
 {
 
@@ -203,9 +202,35 @@ void InitializeControllers()
 	}
 }
 
+internal void SDLAudioCallback(void *userdata, Uint8 *AudioData, int length)
+{
+	memset(AudioData, 0, length);
+}
+
+internal void InitializeAudio()
+{
+	SDL_AudioSpec audioSettings = {0};
+	// TODO(bruno): maybe extract these to globals?
+	audioSettings.freq = 48000;
+	audioSettings.format = AUDIO_S16LSB;
+	audioSettings.channels = 2;
+	audioSettings.samples = 4096;
+	audioSettings.callback = SDLAudioCallback;
+
+	SDL_OpenAudio(&audioSettings, NULL);
+
+	if (audioSettings.format != AUDIO_S16LSB)
+	{
+		// TODO(bruno): complain we didn't get the format we wanted.
+	}
+
+	SDL_PauseAudio(false);
+}
+
 int main(int argc, char *argv[])
 {
-	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC);
+	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC |
+			 SDL_INIT_AUDIO);
 
 	SDL_Window *window = SDL_CreateWindow(
 		"Handmade Hero", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640,
@@ -213,6 +238,7 @@ int main(int argc, char *argv[])
 	if (window)
 	{
 		InitializeControllers();
+		InitializeAudio();
 
 		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 		if (renderer)
@@ -301,6 +327,10 @@ int main(int argc, char *argv[])
 		// TODO(bruno): Logging
 	}
 
+	// TODO(bruno): maybe we should close the controllers and rumble handles on
+	// exit. or maybe not, since the OS should take care of that when the
+	// process ends.
+	// TODO(bruno): same for audio.
 	SDL_Quit();
 	return (0);
 }
