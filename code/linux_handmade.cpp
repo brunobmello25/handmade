@@ -26,6 +26,8 @@ struct Backbuffer
 	GC gc;
 	int width, height;
 	uint32_t *pixels;
+	int pitch;
+	XImage *ximage;
 };
 
 global_variable Backbuffer globalBackbuffer;
@@ -47,6 +49,7 @@ void InitializeBackbuffer(Backbuffer *backbuffer)
 
 	backbuffer->width = 1280;
 	backbuffer->height = 720;
+	backbuffer->pitch = backbuffer->width * sizeof(uint32_t);
 	backbuffer->pixels = (uint32_t *)malloc(
 		backbuffer->width * backbuffer->height * sizeof(uint32_t));
 
@@ -81,6 +84,11 @@ void InitializeBackbuffer(Backbuffer *backbuffer)
 	/* clear the window and bring it on top of the other windows */
 	XClearWindow(backbuffer->dis, backbuffer->win);
 	XMapRaised(backbuffer->dis, backbuffer->win);
+
+	backbuffer->ximage = XCreateImage(
+		backbuffer->dis, DefaultVisual(backbuffer->dis, backbuffer->screen), 24,
+		ZPixmap, 0, (char *)backbuffer->pixels, backbuffer->width,
+		backbuffer->height, 32, backbuffer->pitch);
 };
 
 internal void ResizeBackbuffer(Backbuffer *buffer, int width, int height)
@@ -88,15 +96,31 @@ internal void ResizeBackbuffer(Backbuffer *buffer, int width, int height)
 	printf("Resizing to %dx%d\n", width, height);
 	buffer->width = width;
 	buffer->height = height;
+	buffer->pitch = buffer->width * sizeof(uint32_t);
 
 	if (buffer->pixels)
 	{
+		printf("Freeing old pixels\n");
 		free(buffer->pixels);
 	};
 
+	printf("Allocating new pixels\n");
 	buffer->pixels = (uint32_t *)malloc(width * height * sizeof(uint32_t));
 
+	printf("Resizing window\n");
 	XResizeWindow(buffer->dis, buffer->win, width, height);
+
+	if (buffer->ximage)
+	{
+		printf("Destroying old ximage\n");
+		XDestroyImage(buffer->ximage);
+	}
+
+	printf("Creating new ximage\n");
+	buffer->ximage =
+		XCreateImage(buffer->dis, DefaultVisual(buffer->dis, buffer->screen),
+					 24, ZPixmap, 0, (char *)buffer->pixels, buffer->width,
+					 buffer->height, 32, buffer->pitch);
 }
 
 int main(void)
@@ -112,6 +136,16 @@ int main(void)
 		XNextEvent(globalBackbuffer.dis, &event);
 		if (event.type == Expose && event.xexpose.count == 0)
 		{
+			GameBackBuffer gamebackbuffer;
+			gamebackbuffer.width = globalBackbuffer.width;
+			gamebackbuffer.height = globalBackbuffer.height;
+			gamebackbuffer.memory = globalBackbuffer.pixels;
+			gamebackbuffer.pitch = globalBackbuffer.pitch;
+			GameUpdateAndRender(&gamebackbuffer, 0, 0);
+
+			XPutImage(globalBackbuffer.dis, globalBackbuffer.win,
+					  globalBackbuffer.gc, globalBackbuffer.ximage, 0, 0, 0, 0,
+					  globalBackbuffer.width, globalBackbuffer.height);
 			// TODO(bruno): redraw
 		}
 		if (event.type == KeyPress &&
