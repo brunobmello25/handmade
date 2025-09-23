@@ -207,15 +207,16 @@ internal void SDLAudioCallback(void *userdata, Uint8 *AudioData, int length)
 	memset(AudioData, 0, length);
 }
 
-internal void InitializeAudio()
+internal void InitializeAudio(int32 samplesPerSecond, int32 bufferSize)
 {
+
 	SDL_AudioSpec audioSettings = {0};
 	// TODO(bruno): maybe extract these to globals?
-	audioSettings.freq = 48000;
+	audioSettings.freq = samplesPerSecond;
 	audioSettings.format = AUDIO_S16LSB;
 	audioSettings.channels = 2;
-	audioSettings.samples = 4096;
-	audioSettings.callback = SDLAudioCallback;
+	audioSettings.samples = 1024;
+	audioSettings.callback = &SDLAudioCallback;
 
 	SDL_OpenAudio(&audioSettings, NULL);
 
@@ -223,8 +224,6 @@ internal void InitializeAudio()
 	{
 		// TODO(bruno): complain we didn't get the format we wanted.
 	}
-
-	SDL_PauseAudio(false);
 }
 
 int main(int argc, char *argv[])
@@ -238,7 +237,6 @@ int main(int argc, char *argv[])
 	if (window)
 	{
 		InitializeControllers();
-		InitializeAudio();
 
 		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 		if (renderer)
@@ -249,6 +247,21 @@ int main(int argc, char *argv[])
 							 dimension.height);
 			int xOffset = 0;
 			int yOffset = 0;
+
+			int samplesPerSecond = 48000;
+			int toneHz = 256;
+			int16 toneVolume = 3000;
+			uint32 runningSampleIndex = 0;
+			int squareWavePeriod = samplesPerSecond / toneHz;
+			int halfSquareWavePeriod = squareWavePeriod / 2;
+			int bytesPerSample = sizeof(int16) * 2;
+			// TODO(bruno): samplespersecond/60 because we want to write 800
+			// frame. but this calculation probably shouldn't be here.
+			int bytesToWrite = 800 * bytesPerSample;
+
+			InitializeAudio(samplesPerSecond, bytesToWrite);
+			bool soundPlaying = false;
+
 			while (running)
 			{
 				SDL_Event event;
@@ -258,6 +271,30 @@ int main(int argc, char *argv[])
 					{
 						running = false;
 					}
+				}
+
+				void *soundBuffer = malloc(bytesToWrite);
+				int16 *sampleOut = (int16 *)soundBuffer;
+				int sampleCount = bytesToWrite / bytesPerSample;
+
+				// TODO(bruno): understand what the hell is going on here.
+				for (int sampleIndex = 0; sampleIndex < sampleCount;
+					 ++sampleIndex)
+				{
+					int16 sampleValue =
+						((runningSampleIndex++ / halfSquareWavePeriod) % 2)
+							? toneVolume
+							: -toneVolume;
+					*sampleOut++ = sampleValue;
+					*sampleOut++ = sampleValue;
+				}
+				SDL_QueueAudio(1, soundBuffer, bytesToWrite);
+				free(soundBuffer);
+
+				if (!soundPlaying)
+				{
+					SDL_PauseAudio(false);
+					soundPlaying = true;
 				}
 
 				for (int controllerIndex = 0; controllerIndex < MAX_CONTROLLERS;
