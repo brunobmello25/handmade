@@ -1,19 +1,39 @@
 #include <SDL.h>
-#include <cstdint>
-#include <cstdio>
 #include <stdint.h>
-#include <stdlib.h>
+#include <stdio.h>
+#include <sys/mman.h>
+
+// NOTE: MAP_ANONYMOUS is not defined on Mac OS X and some other UNIX systems.
+// On the vast majority of those systems, one can use MAP_ANON instead.
+// Huge thanks to Adam Rosenfield for investigating this, and suggesting this
+// workaround:
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
 
 #define internal static
-#define global_variable static
 #define local_persist static
+#define global_variable static
 
-#include "handmade.cpp"
+typedef int8_t int8;
+typedef int16_t int16;
+typedef int32_t int32;
+typedef int64_t int64;
 
-global_variable bool Running = true;
+typedef uint8_t uint8;
+typedef uint16_t uint16;
+typedef uint32_t uint32;
+typedef uint64_t uint64;
 
-global_variable int XOffset = 0;
-global_variable int YOffset = 0;
+struct Backbuffer
+{
+	// NOTE(bruno): Pixels are always 32-bits wide, Memory Order BB GG RR XX
+	SDL_Texture *texture;
+	void *memory;
+	int width;
+	int height;
+	int pitch;
+};
 
 struct WindowDimension
 {
@@ -21,79 +41,67 @@ struct WindowDimension
 	int height;
 };
 
-WindowDimension GetWindowDimension(SDL_Window *Window)
+global_variable Backbuffer globalBackbuffer;
+
+WindowDimension GetWindowDimension(SDL_Window *window)
 {
-	WindowDimension Result;
-	SDL_GetWindowSize(Window, &Result.width, &Result.height);
-	return Result;
+	WindowDimension result;
+
+	SDL_GetWindowSize(window, &result.width, &result.height);
+
+	return (result);
 }
 
-struct BackBuffer
+internal void RenderWeirdGradient(Backbuffer Buffer, int BlueOffset,
+								  int GreenOffset)
 {
-	SDL_Texture *texture;
-	void *memory;
-	int width;
-	int height;
-	int bytesPerPixel;
-};
-
-global_variable BackBuffer globalBackbuffer;
-
-internal void RenderWeirdGradient(BackBuffer buffer, int xOffset, int yOffset)
-{
-	int pitch = buffer.width * buffer.bytesPerPixel;
-	uint8_t *row = (uint8_t *)buffer.memory;
-	for (int Y = 0; Y < buffer.height; ++Y)
+	uint8 *Row = (uint8 *)Buffer.memory;
+	for (int Y = 0; Y < Buffer.height; ++Y)
 	{
-		uint32_t *Pixel = (uint32_t *)row;
-		for (int X = 0; X < buffer.width; ++X)
+		uint32 *Pixel = (uint32 *)Row;
+		for (int X = 0; X < Buffer.width; ++X)
 		{
-			uint8_t Blue = (X + xOffset);
-			uint8_t Green = (Y + yOffset);
+			uint8 Blue = (X + BlueOffset);
+			uint8 Green = (Y + GreenOffset);
 
 			*Pixel++ = ((Green << 8) | Blue);
 		}
 
-		row += pitch;
+		Row += Buffer.pitch;
 	}
 }
 
-void SDLResizeTexture(BackBuffer *buffer, SDL_Renderer *renderer, int width,
-					  int height, int xoffset, int yoffset)
+internal void SDLResizeTexture(Backbuffer *buffer, SDL_Renderer *renderer,
+							   int width, int height)
 {
+	int bytesPerPixel = 4;
 	if (buffer->memory)
 	{
-		free(buffer->memory);
+		munmap(buffer->memory, buffer->width * buffer->height * bytesPerPixel);
 	}
-
 	if (buffer->texture)
 	{
 		SDL_DestroyTexture(buffer->texture);
 	}
-
 	buffer->texture =
 		SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
 	buffer->width = width;
 	buffer->height = height;
-	buffer->bytesPerPixel = 4;
-
+	buffer->pitch = width * bytesPerPixel;
 	buffer->memory =
-		malloc(buffer->width * buffer->height * buffer->bytesPerPixel);
-
-	RenderWeirdGradient(*buffer, xoffset, yoffset);
+		mmap(0, width * height * bytesPerPixel, PROT_READ | PROT_WRITE,
+			 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 }
 
-void SDLUpdateWindow(BackBuffer buffer, SDL_Window *window,
-					 SDL_Renderer *renderer)
+internal void SDLUpdateWindow(SDL_Window *Window, SDL_Renderer *Renderer,
+							  Backbuffer Buffer)
 {
-	// TODO(bruno): Handle error
-	int pitch = buffer.width * buffer.bytesPerPixel;
-	SDL_UpdateTexture(buffer.texture, NULL, buffer.memory, pitch);
+	SDL_UpdateTexture(Buffer.texture, 0, Buffer.memory, Buffer.pitch);
 
-	SDL_RenderCopy(renderer, buffer.texture, NULL, NULL);
+	SDL_RenderCopy(Renderer, Buffer.texture, 0, 0);
 
-	SDL_RenderPresent(renderer);
+	SDL_RenderPresent(Renderer);
 }
 
 bool HandleEvent(SDL_Event *event)
@@ -104,6 +112,7 @@ bool HandleEvent(SDL_Event *event)
 	{
 		case SDL_QUIT:
 		{
+			printf("SDL_QUIT\n");
 			shouldQuit = true;
 		}
 		break;
@@ -117,6 +126,8 @@ bool HandleEvent(SDL_Event *event)
 					SDL_Window *window =
 						SDL_GetWindowFromID(event->window.windowID);
 					SDL_Renderer *renderer = SDL_GetRenderer(window);
+					printf("SDL_WINDOWEVENT_SIZE_CHANGED (%d, %d)\n",
+						   event->window.data1, event->window.data2);
 				}
 				break;
 
@@ -131,8 +142,7 @@ bool HandleEvent(SDL_Event *event)
 					SDL_Window *window =
 						SDL_GetWindowFromID(event->window.windowID);
 					SDL_Renderer *renderer = SDL_GetRenderer(window);
-
-					SDLUpdateWindow(globalBackbuffer, window, renderer);
+					SDLUpdateWindow(window, renderer, globalBackbuffer);
 				}
 				break;
 			}
@@ -140,55 +150,54 @@ bool HandleEvent(SDL_Event *event)
 		break;
 	}
 
-	return shouldQuit;
+	return (shouldQuit);
 }
 
 int main(int argc, char *argv[])
 {
-
 	SDL_Init(SDL_INIT_VIDEO);
 
-	SDL_Window *Window = SDL_CreateWindow(
-		"Handmade Hero", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280,
-		720, SDL_WINDOW_RESIZABLE);
-
-	if (Window)
+	SDL_Window *window = SDL_CreateWindow(
+		"Handmade Hero", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640,
+		480, SDL_WINDOW_RESIZABLE);
+	if (window)
 	{
-		SDL_Renderer *Renderer = SDL_CreateRenderer(Window, -1, 0);
-
-		if (Renderer)
+		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+		if (renderer)
 		{
 			bool running = true;
-			int Width, Height;
-			WindowDimension Dimension = GetWindowDimension(Window);
-			SDLResizeTexture(&globalBackbuffer, Renderer, Dimension.width,
-							 Dimension.height, XOffset, YOffset);
-
+			WindowDimension dimension = GetWindowDimension(window);
+			SDLResizeTexture(&globalBackbuffer, renderer, dimension.width,
+							 dimension.height);
+			int xOffset = 0;
+			int yOffset = 0;
 			while (running)
 			{
-				SDL_Event Event;
-				while (SDL_PollEvent(&Event))
+				SDL_Event event;
+				while (SDL_PollEvent(&event))
 				{
-					if (HandleEvent(&Event))
+					if (HandleEvent(&event))
 					{
 						running = false;
 					}
 				}
-				RenderWeirdGradient(globalBackbuffer, XOffset, YOffset);
-				SDLUpdateWindow(globalBackbuffer, Window, Renderer);
+				RenderWeirdGradient(globalBackbuffer, xOffset, yOffset);
+				SDLUpdateWindow(window, renderer, globalBackbuffer);
 
-				++XOffset;
+				++xOffset;
+				yOffset += 2;
 			}
 		}
 		else
 		{
-			// TODO:(Bruno): Logging
+			// TODO(bruno): Logging
 		}
 	}
 	else
 	{
-		// TODO:(Bruno): Logging
+		// TODO(bruno): Logging
 	}
 
+	SDL_Quit();
 	return (0);
 }
