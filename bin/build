@@ -2,7 +2,7 @@
 
 set -e
 
-PLATFORM=${1:-linux}
+PLATFORM=${1:-sdl}
 
 usage() {
     echo "Usage: $0 [raylib|sdl]"

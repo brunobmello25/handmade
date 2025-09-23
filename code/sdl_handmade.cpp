@@ -8,119 +8,115 @@
 #define global_variable static
 #define local_persist static
 
+#include "handmade.cpp"
+
 global_variable bool Running = true;
 
-struct sdl_window_dimension
+global_variable int XOffset = 0;
+global_variable int YOffset = 0;
+
+struct WindowDimension
 {
-	int Width;
-	int Height;
+	int width;
+	int height;
 };
 
-sdl_window_dimension SdlGetWindowDimension(SDL_Window *Window)
+WindowDimension GetWindowDimension(SDL_Window *Window)
 {
-	sdl_window_dimension Result;
-	SDL_GetWindowSize(Window, &Result.Width, &Result.Height);
+	WindowDimension Result;
+	SDL_GetWindowSize(Window, &Result.width, &Result.height);
 	return Result;
 }
 
-struct sdl_offscreen_buffer
+struct BackBuffer
 {
-	SDL_Texture *Texture;
-	void *Memory;
-	int Width;
-	int Height;
-	int BytesPerPixel;
+	SDL_Texture *texture;
+	void *memory;
+	int width;
+	int height;
+	int bytesPerPixel;
 };
 
-global_variable sdl_offscreen_buffer GlobalBackbuffer;
+global_variable BackBuffer globalBackbuffer;
 
-internal void RenderWeirdGradient(sdl_offscreen_buffer Buffer, int XOffset,
-								  int YOffset)
+internal void RenderWeirdGradient(BackBuffer buffer, int xOffset, int yOffset)
 {
-	int Width = Buffer.Width;
-	int Height = Buffer.Height;
-
-	int Pitch = Width * Buffer.BytesPerPixel;
-	uint8_t *Row = (uint8_t *)Buffer.Memory;
-	for (int Y = 0; Y < Buffer.Height; ++Y)
+	int pitch = buffer.width * buffer.bytesPerPixel;
+	uint8_t *row = (uint8_t *)buffer.memory;
+	for (int Y = 0; Y < buffer.height; ++Y)
 	{
-		uint32_t *Pixel = (uint32_t *)Row;
-		for (int X = 0; X < Buffer.Width; ++X)
+		uint32_t *Pixel = (uint32_t *)row;
+		for (int X = 0; X < buffer.width; ++X)
 		{
-			uint8_t Blue = (X + XOffset);
-			uint8_t Green = (Y + YOffset);
+			uint8_t Blue = (X + xOffset);
+			uint8_t Green = (Y + yOffset);
 
 			*Pixel++ = ((Green << 8) | Blue);
 		}
 
-		Row += Pitch;
+		row += pitch;
 	}
 }
 
-void SDLResizeTexture(sdl_offscreen_buffer *Buffer, SDL_Renderer *Renderer,
-					  int Width, int Height)
+void SDLResizeTexture(BackBuffer *buffer, SDL_Renderer *renderer, int width,
+					  int height, int xoffset, int yoffset)
 {
-	if (Buffer->Memory)
+	if (buffer->memory)
 	{
-		free(Buffer->Memory);
+		free(buffer->memory);
 	}
 
-	if (Buffer->Texture)
+	if (buffer->texture)
 	{
-		SDL_DestroyTexture(Buffer->Texture);
+		SDL_DestroyTexture(buffer->texture);
 	}
 
-	Buffer->Texture =
-		SDL_CreateTexture(Renderer, SDL_PIXELFORMAT_ARGB8888,
-						  SDL_TEXTUREACCESS_STREAMING, Width, Height);
-	Buffer->Width = Width;
-	Buffer->Height = Height;
-	Buffer->BytesPerPixel = 4;
+	buffer->texture =
+		SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+						  SDL_TEXTUREACCESS_STREAMING, width, height);
+	buffer->width = width;
+	buffer->height = height;
+	buffer->bytesPerPixel = 4;
 
-	Buffer->Memory =
-		malloc(Buffer->Width * Buffer->Height * Buffer->BytesPerPixel);
+	buffer->memory =
+		malloc(buffer->width * buffer->height * buffer->bytesPerPixel);
 
-	RenderWeirdGradient(*Buffer, 128, 0);
+	RenderWeirdGradient(*buffer, xoffset, yoffset);
 }
 
-void SDLUpdateWindow(sdl_offscreen_buffer Buffer, SDL_Window *Window,
-					 SDL_Renderer *Renderer)
+void SDLUpdateWindow(BackBuffer buffer, SDL_Window *window,
+					 SDL_Renderer *renderer)
 {
+	// TODO(bruno): Handle error
+	int pitch = buffer.width * buffer.bytesPerPixel;
+	SDL_UpdateTexture(buffer.texture, NULL, buffer.memory, pitch);
 
-	// TODO: (Bruno) Handle error
-	int pitch = Buffer.Width * Buffer.BytesPerPixel;
-	SDL_UpdateTexture(Buffer.Texture, NULL, Buffer.Memory, pitch);
+	SDL_RenderCopy(renderer, buffer.texture, NULL, NULL);
 
-	SDL_RenderCopy(Renderer, Buffer.Texture, NULL, NULL);
-
-	SDL_RenderPresent(Renderer);
+	SDL_RenderPresent(renderer);
 }
 
-bool HandleEvent(SDL_Event *Event)
+bool HandleEvent(SDL_Event *event)
 {
-	bool ShouldQuit = false;
+	bool shouldQuit = false;
 
-	switch (Event->type)
+	switch (event->type)
 	{
 		case SDL_QUIT:
 		{
-			printf("SDL_QUIT\n");
-			ShouldQuit = true;
+			shouldQuit = true;
 		}
 		break;
 
 		case SDL_WINDOWEVENT:
 		{
-			switch (Event->window.event)
+			switch (event->window.event)
 			{
 				case SDL_WINDOWEVENT_SIZE_CHANGED:
 				{
-					SDL_Window *Window =
-						SDL_GetWindowFromID(Event->window.windowID);
-					SDL_Renderer *Renderer = SDL_GetRenderer(Window);
-
-					printf("SDL_WINDOWEVENT_SIZE_CHANGED (%d, %d)\n",
-						   Event->window.data1, Event->window.data2);
+					SDL_Window *window =
+						SDL_GetWindowFromID(event->window.windowID);
+					SDL_Renderer *renderer = SDL_GetRenderer(window);
 				}
 				break;
 
@@ -132,11 +128,11 @@ bool HandleEvent(SDL_Event *Event)
 
 				case SDL_WINDOWEVENT_EXPOSED:
 				{
-					SDL_Window *Window =
-						SDL_GetWindowFromID(Event->window.windowID);
-					SDL_Renderer *Renderer = SDL_GetRenderer(Window);
+					SDL_Window *window =
+						SDL_GetWindowFromID(event->window.windowID);
+					SDL_Renderer *renderer = SDL_GetRenderer(window);
 
-					SDLUpdateWindow(GlobalBackbuffer, Window, Renderer);
+					SDLUpdateWindow(globalBackbuffer, window, renderer);
 				}
 				break;
 			}
@@ -144,7 +140,7 @@ bool HandleEvent(SDL_Event *Event)
 		break;
 	}
 
-	return ShouldQuit;
+	return shouldQuit;
 }
 
 int main(int argc, char *argv[])
@@ -153,8 +149,8 @@ int main(int argc, char *argv[])
 	SDL_Init(SDL_INIT_VIDEO);
 
 	SDL_Window *Window = SDL_CreateWindow(
-		"Handmade Hero", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640,
-		480, SDL_WINDOW_RESIZABLE);
+		"Handmade Hero", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280,
+		720, SDL_WINDOW_RESIZABLE);
 
 	if (Window)
 	{
@@ -162,25 +158,24 @@ int main(int argc, char *argv[])
 
 		if (Renderer)
 		{
-			bool Running = true;
+			bool running = true;
 			int Width, Height;
-			sdl_window_dimension Dimension = SdlGetWindowDimension(Window);
-			SDLResizeTexture(&GlobalBackbuffer, Renderer, 1280, 720);
+			WindowDimension Dimension = GetWindowDimension(Window);
+			SDLResizeTexture(&globalBackbuffer, Renderer, Dimension.width,
+							 Dimension.height, XOffset, YOffset);
 
-			int XOffset = 0;
-			int YOffset = 0;
-			while (Running)
+			while (running)
 			{
 				SDL_Event Event;
 				while (SDL_PollEvent(&Event))
 				{
 					if (HandleEvent(&Event))
 					{
-						Running = false;
+						running = false;
 					}
 				}
-				RenderWeirdGradient(GlobalBackbuffer, XOffset, YOffset);
-				SDLUpdateWindow(GlobalBackbuffer, Window, Renderer);
+				RenderWeirdGradient(globalBackbuffer, XOffset, YOffset);
+				SDLUpdateWindow(globalBackbuffer, Window, Renderer);
 
 				++XOffset;
 			}
