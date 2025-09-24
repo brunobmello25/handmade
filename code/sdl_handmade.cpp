@@ -2,6 +2,7 @@
 #include <SDL_audio.h>
 #include <cstdlib>
 #include <cstring>
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -30,6 +31,9 @@ typedef uint8_t uint8;
 typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
+
+typedef float real32;
+typedef double real64;
 
 struct Backbuffer
 {
@@ -275,7 +279,10 @@ int main(int argc, char *argv[])
 	if (window)
 	{
 
-		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+		// TODO(bruno): this presentvsync should probably be removed once we
+		// enforce framerate
+		SDL_Renderer *renderer =
+			SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
 		if (renderer)
 		{
 			bool running = true;
@@ -289,8 +296,8 @@ int main(int argc, char *argv[])
 			int toneHz = 256;
 			int16 toneVolume = 3000;
 			uint32 runningSampleIndex = 0;
-			int squareWavePeriod = sampleRate / toneHz;
-			int halfSquareWavePeriod = squareWavePeriod / 2;
+			int wavePeriod = sampleRate / toneHz;
+			int halfWavePeriod = wavePeriod / 2;
 			int bytesPerSample = sizeof(int16) * 2;
 			int secondaryBufferSize = sampleRate * bytesPerSample;
 			// TODO(bruno): samplespersecond/60 because we want to write 800
@@ -369,6 +376,8 @@ int main(int argc, char *argv[])
 				int byteToLock =
 					runningSampleIndex * bytesPerSample % secondaryBufferSize;
 				int bytesToWrite;
+				// TODO(bruno): we need a more accurate check than
+				// byteToLock == playCursor
 				if (byteToLock == globalAudioRingBuffer.playCursor)
 				{
 					bytesToWrite = secondaryBufferSize;
@@ -397,12 +406,16 @@ int main(int argc, char *argv[])
 				for (int SampleIndex = 0; SampleIndex < Region1SampleCount;
 					 ++SampleIndex)
 				{
-					int16 SampleValue =
-						((runningSampleIndex++ / halfSquareWavePeriod) % 2)
+					real32 sineValue = ;
+
+					int16 sampleValue = ? ;
+
+					int16 sampleValue =
+						((runningSampleIndex++ / halfWavePeriod) % 2)
 							? toneVolume
 							: -toneVolume;
-					*SampleOut++ = SampleValue;
-					*SampleOut++ = SampleValue;
+					*SampleOut++ = sampleValue;
+					*SampleOut++ = sampleValue;
 				}
 
 				int Region2SampleCount = Region2Size / bytesPerSample;
@@ -411,7 +424,7 @@ int main(int argc, char *argv[])
 					 ++SampleIndex)
 				{
 					int16 SampleValue =
-						((runningSampleIndex++ / halfSquareWavePeriod) % 2)
+						((runningSampleIndex++ / halfWavePeriod) % 2)
 							? toneVolume
 							: -toneVolume;
 					*SampleOut++ = SampleValue;
