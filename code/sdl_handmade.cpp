@@ -267,13 +267,13 @@ int main(int argc, char *argv[])
 {
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC |
 			 SDL_INIT_AUDIO);
+	InitializeControllers();
 
 	SDL_Window *window = SDL_CreateWindow(
 		"Handmade Hero", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640,
 		480, SDL_WINDOW_RESIZABLE);
 	if (window)
 	{
-		InitializeControllers();
 
 		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 		if (renderer)
@@ -295,9 +295,6 @@ int main(int argc, char *argv[])
 			int secondaryBufferSize = sampleRate * bytesPerSample;
 			// TODO(bruno): samplespersecond/60 because we want to write 800
 			// frame. but this calculation probably shouldn't be here.
-
-			// int targetQueueBytes = sampleRate * bytesPerSample;
-			// int bytesToWrite = targetQueueBytes - SDL_GetQueuedAudioSize(1);
 
 			InitializeAudio(sampleRate, secondaryBufferSize);
 			bool soundPlaying = false;
@@ -366,9 +363,9 @@ int main(int argc, char *argv[])
 
 				RenderWeirdGradient(globalBackbuffer, xOffset, yOffset);
 
-				SDL_LockAudio();
 				// TODO(bruno): what in the actual skibidi whippy flying fuck
 				// is happening here
+				SDL_LockAudio();
 				int byteToLock =
 					runningSampleIndex * bytesPerSample % secondaryBufferSize;
 				int bytesToWrite;
