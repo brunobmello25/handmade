@@ -417,6 +417,11 @@ int main(int argc, char *argv[])
 						int16 stickY = SDL_GameControllerGetAxis(
 							controller, SDL_CONTROLLER_AXIS_LEFTY);
 
+						soundOutput.toneHz =
+							512 + (int)(256.0f * ((real32)stickY / 30000.0f));
+						soundOutput.wavePeriod =
+							soundOutput.sampleRate / soundOutput.toneHz;
+
 						if (aButton)
 						{
 							yOffset += 2;
