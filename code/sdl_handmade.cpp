@@ -38,6 +38,8 @@ typedef uint64_t uint64;
 typedef float real32;
 typedef double real64;
 
+#include "handmade.cpp"
+
 struct Backbuffer
 {
 	// NOTE(bruno): Pixels are always 32-bits wide, Memory Order BB GG RR XX
@@ -90,25 +92,6 @@ WindowDimension GetWindowDimension(SDL_Window *window)
 	SDL_GetWindowSize(window, &result.width, &result.height);
 
 	return (result);
-}
-
-internal void RenderWeirdGradient(Backbuffer Buffer, int BlueOffset,
-								  int GreenOffset)
-{
-	uint8 *Row = (uint8 *)Buffer.memory;
-	for (int Y = 0; Y < Buffer.height; ++Y)
-	{
-		uint32 *Pixel = (uint32 *)Row;
-		for (int X = 0; X < Buffer.width; ++X)
-		{
-			uint8 Blue = (X + BlueOffset);
-			uint8 Green = (Y + GreenOffset);
-
-			*Pixel++ = ((Green << 8) | Blue);
-		}
-
-		Row += Buffer.pitch;
-	}
 }
 
 internal void SDLResizeTexture(Backbuffer *buffer, SDL_Renderer *renderer,
@@ -443,7 +426,12 @@ int main(int argc, char *argv[])
 					}
 				}
 
-				RenderWeirdGradient(globalBackbuffer, xOffset, yOffset);
+				GameBackBuffer gameBackbuffer;
+				gameBackbuffer.width = globalBackbuffer.width;
+				gameBackbuffer.height = globalBackbuffer.height;
+				gameBackbuffer.pitch = globalBackbuffer.pitch;
+				gameBackbuffer.memory = globalBackbuffer.memory;
+				GameUpdateAndRender(&gameBackbuffer, xOffset, yOffset);
 
 				// TODO(bruno): what in the actual skibidi whippy flying fuck
 				// is happening here
