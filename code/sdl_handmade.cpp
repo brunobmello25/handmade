@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <sys/mman.h>
 
+#define Pi32 3.14159265359f
+
 // TODO(bruno): estudar mmap
 
 // NOTE: MAP_ANONYMOUS is not defined on Mac OS X and some other UNIX systems.
@@ -59,8 +61,22 @@ struct WindowDimension
 	int height;
 };
 
+struct SoundOutput
+{
+	int sampleRate;
+	int toneHz;
+	int toneVolume;
+	uint32 runningSampleIndex;
+	int wavePeriod;
+	int bytesPerSample;
+	int secondaryBufferSize;
+	int latencySampleCount;
+	real32 tSine;
+};
+
 global_variable Backbuffer globalBackbuffer;
 global_variable AudioRingBuffer globalAudioRingBuffer;
+global_variable bool globalRunning;
 
 #define MAX_CONTROLLERS 4
 SDL_GameController *ControllerHandles[MAX_CONTROLLERS];
@@ -267,6 +283,46 @@ internal void InitializeAudio(int32 sampleRate, int32 bufferSize)
 	}
 }
 
+internal void FillSoundBuffer(SoundOutput *soundOutput, int byteToLock,
+							  int bytesToWrite)
+{
+	void *region1 = (uint8 *)globalAudioRingBuffer.data + byteToLock;
+	int region1Size = bytesToWrite;
+	if (region1Size + byteToLock > soundOutput->secondaryBufferSize)
+	{
+		region1Size = soundOutput->secondaryBufferSize - byteToLock;
+	}
+	void *region2 = globalAudioRingBuffer.data;
+	int region2Size = bytesToWrite - region1Size;
+	int region1SampleCount = region1Size / soundOutput->bytesPerSample;
+	int16 *SampleOut = (int16 *)region1;
+	for (int SampleIndex = 0; SampleIndex < region1SampleCount; ++SampleIndex)
+	{
+		real32 SineValue = sinf(soundOutput->tSine);
+		int16 SampleValue = (int16)(SineValue * soundOutput->toneVolume);
+		*SampleOut++ = SampleValue;
+		*SampleOut++ = SampleValue;
+
+		soundOutput->tSine +=
+			2.0f * Pi32 * 1.0f / (real32)soundOutput->wavePeriod;
+		++soundOutput->runningSampleIndex;
+	}
+
+	int region2SampleCount = region2Size / soundOutput->bytesPerSample;
+	SampleOut = (int16 *)region2;
+	for (int SampleIndex = 0; SampleIndex < region2SampleCount; ++SampleIndex)
+	{
+		real32 SineValue = sinf(soundOutput->tSine);
+		int16 SampleValue = (int16)(SineValue * soundOutput->toneVolume);
+		*SampleOut++ = SampleValue;
+		*SampleOut++ = SampleValue;
+
+		soundOutput->tSine +=
+			2.0f * Pi32 * 1.0f / (real32)soundOutput->wavePeriod;
+		++soundOutput->runningSampleIndex;
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC |
@@ -278,42 +334,47 @@ int main(int argc, char *argv[])
 		480, SDL_WINDOW_RESIZABLE);
 	if (window)
 	{
+		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 
-		// TODO(bruno): this presentvsync should probably be removed once we
-		// enforce framerate
-		SDL_Renderer *renderer =
-			SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
 		if (renderer)
 		{
-			bool running = true;
 			WindowDimension dimension = GetWindowDimension(window);
 			SDLResizeTexture(&globalBackbuffer, renderer, dimension.width,
 							 dimension.height);
 			int xOffset = 0;
 			int yOffset = 0;
 
-			int sampleRate = 48000;
-			int toneHz = 256;
-			int16 toneVolume = 3000;
-			uint32 runningSampleIndex = 0;
-			int wavePeriod = sampleRate / toneHz;
-			int halfWavePeriod = wavePeriod / 2;
-			int bytesPerSample = sizeof(int16) * 2;
-			int secondaryBufferSize = sampleRate * bytesPerSample;
-			// TODO(bruno): samplespersecond/60 because we want to write 800
-			// frame. but this calculation probably shouldn't be here.
-
-			InitializeAudio(sampleRate, secondaryBufferSize);
 			bool soundPlaying = false;
 
-			while (running)
+			SoundOutput soundOutput = {};
+			soundOutput.sampleRate = 48000;
+			soundOutput.toneHz = 256;
+			soundOutput.toneVolume = 3000;
+			soundOutput.runningSampleIndex = 0;
+			soundOutput.wavePeriod =
+				soundOutput.sampleRate / soundOutput.toneHz;
+			soundOutput.bytesPerSample = sizeof(int16) * 2;
+			soundOutput.secondaryBufferSize =
+				soundOutput.sampleRate * soundOutput.bytesPerSample;
+			soundOutput.latencySampleCount = soundOutput.sampleRate / 15;
+			soundOutput.tSine = 0.0f;
+
+			InitializeAudio(soundOutput.sampleRate,
+							soundOutput.secondaryBufferSize);
+			FillSoundBuffer(&soundOutput, 0,
+							soundOutput.latencySampleCount *
+								soundOutput.bytesPerSample);
+			SDL_PauseAudio(0);
+
+			globalRunning = true;
+			while (globalRunning)
 			{
 				SDL_Event event;
 				while (SDL_PollEvent(&event))
 				{
 					if (HandleEvent(&event))
 					{
-						running = false;
+						globalRunning = false;
 					}
 				}
 
@@ -373,69 +434,28 @@ int main(int argc, char *argv[])
 				// TODO(bruno): what in the actual skibidi whippy flying fuck
 				// is happening here
 				SDL_LockAudio();
-				int byteToLock =
-					runningSampleIndex * bytesPerSample % secondaryBufferSize;
-				int bytesToWrite;
-				// TODO(bruno): we need a more accurate check than
-				// byteToLock == playCursor
-				if (byteToLock == globalAudioRingBuffer.playCursor)
+				int byteToLock = (soundOutput.runningSampleIndex *
+								  soundOutput.bytesPerSample) %
+								 soundOutput.secondaryBufferSize;
+				int targetCursor = ((globalAudioRingBuffer.playCursor +
+									 (soundOutput.latencySampleCount *
+									  soundOutput.bytesPerSample)) %
+									soundOutput.secondaryBufferSize);
+
+				int BytesToWrite;
+				if (byteToLock > targetCursor)
 				{
-					bytesToWrite = secondaryBufferSize;
-				}
-				else if (byteToLock > globalAudioRingBuffer.playCursor)
-				{
-					bytesToWrite = (secondaryBufferSize - byteToLock);
-					bytesToWrite += globalAudioRingBuffer.playCursor;
+					BytesToWrite =
+						(soundOutput.secondaryBufferSize - byteToLock);
+					BytesToWrite += targetCursor;
 				}
 				else
 				{
-					bytesToWrite =
-						globalAudioRingBuffer.playCursor - byteToLock;
+					BytesToWrite = targetCursor - byteToLock;
 				}
 
-				void *region1 =
-					(uint8 *)globalAudioRingBuffer.data + byteToLock;
-				int region1Size = bytesToWrite;
-				if (region1Size + byteToLock > secondaryBufferSize)
-					region1Size = secondaryBufferSize - byteToLock;
-				void *Region2 = globalAudioRingBuffer.data;
-				int Region2Size = bytesToWrite - region1Size;
 				SDL_UnlockAudio();
-				int Region1SampleCount = region1Size / bytesPerSample;
-				int16 *SampleOut = (int16 *)region1;
-				for (int SampleIndex = 0; SampleIndex < Region1SampleCount;
-					 ++SampleIndex)
-				{
-					real32 sineValue = ;
-
-					int16 sampleValue = ? ;
-
-					int16 sampleValue =
-						((runningSampleIndex++ / halfWavePeriod) % 2)
-							? toneVolume
-							: -toneVolume;
-					*SampleOut++ = sampleValue;
-					*SampleOut++ = sampleValue;
-				}
-
-				int Region2SampleCount = Region2Size / bytesPerSample;
-				SampleOut = (int16 *)Region2;
-				for (int SampleIndex = 0; SampleIndex < Region2SampleCount;
-					 ++SampleIndex)
-				{
-					int16 SampleValue =
-						((runningSampleIndex++ / halfWavePeriod) % 2)
-							? toneVolume
-							: -toneVolume;
-					*SampleOut++ = SampleValue;
-					*SampleOut++ = SampleValue;
-				}
-
-				if (!soundPlaying)
-				{
-					SDL_PauseAudio(0);
-					soundPlaying = true;
-				}
+				FillSoundBuffer(&soundOutput, byteToLock, BytesToWrite);
 
 				SDLUpdateWindow(window, renderer, globalBackbuffer);
 
