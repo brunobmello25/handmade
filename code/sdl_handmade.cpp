@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/mman.h>
+#include <x86intrin.h>
 
 #define Pi32 3.14159265359f
 
@@ -327,6 +328,9 @@ int main(int argc, char *argv[])
 {
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC |
 			 SDL_INIT_AUDIO);
+
+	uint64 performanceFrequency = SDL_GetPerformanceFrequency();
+
 	InitializeControllers();
 
 	SDL_Window *window = SDL_CreateWindow(
@@ -366,9 +370,14 @@ int main(int argc, char *argv[])
 								soundOutput.bytesPerSample);
 			SDL_PauseAudio(0);
 
+			uint64 lastCounter;
+			uint64 lastCycleCount = _rdtsc();
+
 			globalRunning = true;
 			while (globalRunning)
 			{
+				lastCounter = SDL_GetPerformanceCounter();
+
 				SDL_Event event;
 				while (SDL_PollEvent(&event))
 				{
@@ -465,6 +474,20 @@ int main(int argc, char *argv[])
 				SDLUpdateWindow(window, renderer, globalBackbuffer);
 
 				++xOffset;
+
+				uint64 endCounter = SDL_GetPerformanceCounter();
+				uint64 counterElapsed = endCounter - lastCounter;
+				real64 msPerFrame = (((1000.0f * (real64)counterElapsed) /
+									  (real64)performanceFrequency));
+				real64 fps =
+					(real64)performanceFrequency / (real64)counterElapsed;
+
+				uint64 endCycleCount = _rdtsc();
+				int64 cyclesElapsed = endCycleCount - lastCycleCount;
+				int32 MCPF = (int32)(cyclesElapsed / (1000 * 1000));
+
+				printf("%0.2fms/f,  %0.2f/s,  %dmc/f\n", msPerFrame, fps, MCPF);
+				lastCounter = endCounter;
 			}
 		}
 		else
