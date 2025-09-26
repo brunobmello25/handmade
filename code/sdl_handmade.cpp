@@ -246,12 +246,12 @@ internal void InitializeAudio(int32 sampleRate, int32 bufferSize)
 	audioSettings.freq = sampleRate;
 	audioSettings.format = AUDIO_S16LSB;
 	audioSettings.channels = 2;
-	audioSettings.samples = 1024;
+	audioSettings.samples = 512;
 	audioSettings.callback = &SDLAudioCallback;
 	audioSettings.userdata = &globalAudioRingBuffer;
 
 	globalAudioRingBuffer.size = bufferSize;
-	globalAudioRingBuffer.data = malloc(bufferSize);
+	globalAudioRingBuffer.data = calloc(bufferSize, 1);
 	globalAudioRingBuffer.playCursor = globalAudioRingBuffer.writeCursor = 0;
 
 	SDL_OpenAudio(&audioSettings, NULL);
@@ -268,8 +268,11 @@ internal void InitializeAudio(int32 sampleRate, int32 bufferSize)
 }
 
 internal void FillSoundBuffer(SoundOutput *soundOutput, int byteToLock,
-							  int bytesToWrite)
+							  int bytesToWrite,
+							  GameSoundBuffer *gameSoundBuffer)
 {
+	int16 *samples = gameSoundBuffer->samples;
+
 	void *region1 = (uint8 *)globalAudioRingBuffer.data + byteToLock;
 	int region1Size = bytesToWrite;
 	if (region1Size + byteToLock > soundOutput->secondaryBufferSize)
@@ -282,13 +285,9 @@ internal void FillSoundBuffer(SoundOutput *soundOutput, int byteToLock,
 	int16 *SampleOut = (int16 *)region1;
 	for (int SampleIndex = 0; SampleIndex < region1SampleCount; ++SampleIndex)
 	{
-		real32 SineValue = sinf(soundOutput->tSine);
-		int16 SampleValue = (int16)(SineValue * soundOutput->toneVolume);
-		*SampleOut++ = SampleValue;
-		*SampleOut++ = SampleValue;
+		*SampleOut++ = *samples++;
+		*SampleOut++ = *samples++;
 
-		soundOutput->tSine +=
-			2.0f * Pi32 * 1.0f / (real32)soundOutput->wavePeriod;
 		++soundOutput->runningSampleIndex;
 	}
 
@@ -296,13 +295,9 @@ internal void FillSoundBuffer(SoundOutput *soundOutput, int byteToLock,
 	SampleOut = (int16 *)region2;
 	for (int SampleIndex = 0; SampleIndex < region2SampleCount; ++SampleIndex)
 	{
-		real32 SineValue = sinf(soundOutput->tSine);
-		int16 SampleValue = (int16)(SineValue * soundOutput->toneVolume);
-		*SampleOut++ = SampleValue;
-		*SampleOut++ = SampleValue;
+		*SampleOut++ = *samples++;
+		*SampleOut++ = *samples++;
 
-		soundOutput->tSine +=
-			2.0f * Pi32 * 1.0f / (real32)soundOutput->wavePeriod;
 		++soundOutput->runningSampleIndex;
 	}
 }
@@ -321,7 +316,8 @@ int main(int argc, char *argv[])
 		480, SDL_WINDOW_RESIZABLE);
 	if (window)
 	{
-		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+		SDL_Renderer *renderer =
+			SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
 
 		if (renderer)
 		{
@@ -348,19 +344,16 @@ int main(int argc, char *argv[])
 
 			InitializeAudio(soundOutput.sampleRate,
 							soundOutput.secondaryBufferSize);
-			FillSoundBuffer(&soundOutput, 0,
-							soundOutput.latencySampleCount *
-								soundOutput.bytesPerSample);
+			int16 *samples = (int16 *)calloc(soundOutput.sampleRate,
+											 soundOutput.bytesPerSample);
 			SDL_PauseAudio(0);
 
-			uint64 lastCounter;
+			uint64 lastCounter = SDL_GetPerformanceCounter();
 			uint64 lastCycleCount = _rdtsc();
 
 			globalRunning = true;
 			while (globalRunning)
 			{
-				lastCounter = SDL_GetPerformanceCounter();
-
 				SDL_Event event;
 				while (SDL_PollEvent(&event))
 				{
@@ -409,15 +402,14 @@ int main(int argc, char *argv[])
 						int16 stickY = SDL_GameControllerGetAxis(
 							controller, SDL_CONTROLLER_AXIS_LEFTY);
 
+						xOffset += stickX / 4096;
+						yOffset += stickY / 4096;
+
 						soundOutput.toneHz =
 							512 + (int)(256.0f * ((real32)stickY / 30000.0f));
 						soundOutput.wavePeriod =
 							soundOutput.sampleRate / soundOutput.toneHz;
 
-						if (aButton)
-						{
-							yOffset += 2;
-						}
 						SDL_Haptic *haptic = RumbleHandles[controllerIndex];
 						if (bButton && haptic)
 						{
@@ -425,13 +417,6 @@ int main(int argc, char *argv[])
 						}
 					}
 				}
-
-				GameBackBuffer gameBackbuffer;
-				gameBackbuffer.width = globalBackbuffer.width;
-				gameBackbuffer.height = globalBackbuffer.height;
-				gameBackbuffer.pitch = globalBackbuffer.pitch;
-				gameBackbuffer.memory = globalBackbuffer.memory;
-				GameUpdateAndRender(&gameBackbuffer, xOffset, yOffset);
 
 				// TODO(bruno): what in the actual skibidi whippy flying fuck
 				// is happening here
@@ -455,13 +440,26 @@ int main(int argc, char *argv[])
 				{
 					BytesToWrite = targetCursor - byteToLock;
 				}
-
 				SDL_UnlockAudio();
-				FillSoundBuffer(&soundOutput, byteToLock, BytesToWrite);
+
+				GameSoundBuffer gameSoundBuffer = {};
+				gameSoundBuffer.sampleRate = soundOutput.sampleRate;
+				gameSoundBuffer.sampleCount =
+					BytesToWrite / soundOutput.bytesPerSample;
+				gameSoundBuffer.samples = samples;
+
+				GameBackBuffer gameBackbuffer = {};
+				gameBackbuffer.width = globalBackbuffer.width;
+				gameBackbuffer.height = globalBackbuffer.height;
+				gameBackbuffer.pitch = globalBackbuffer.pitch;
+				gameBackbuffer.memory = globalBackbuffer.memory;
+				GameUpdateAndRender(&gameBackbuffer, xOffset, yOffset,
+									&gameSoundBuffer, soundOutput.toneHz);
+
+				FillSoundBuffer(&soundOutput, byteToLock, BytesToWrite,
+								&gameSoundBuffer);
 
 				SDLUpdateWindow(window, renderer, globalBackbuffer);
-
-				++xOffset;
 
 				uint64 endCounter = SDL_GetPerformanceCounter();
 				uint64 counterElapsed = endCounter - lastCounter;
