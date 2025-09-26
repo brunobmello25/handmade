@@ -1,8 +1,5 @@
 #include <SDL.h>
 #include <SDL_audio.h>
-#include <cstdlib>
-#include <cstring>
-#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>

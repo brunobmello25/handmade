@@ -1,4 +1,5 @@
 #include "handmade.h"
+#include <math.h>
 
 internal void GameOutputSound(GameSoundBuffer *soundBuffer, int toneHz)
 {
