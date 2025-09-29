@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/mman.h>
-#include <x86intrin.h>
 
 // TODO(casey): swap, min, max macros, maybe?
 
