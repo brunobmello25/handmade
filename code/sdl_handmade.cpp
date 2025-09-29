@@ -6,6 +6,8 @@
 #include <sys/mman.h>
 #include <x86intrin.h>
 
+// TODO(casey): swap, min, max macros, maybe?
+
 #define Pi32 3.14159265359f
 
 // TODO(bruno): estudar mmap
@@ -36,10 +38,11 @@ typedef float real32;
 typedef double real64;
 
 #include "handmade.cpp"
+#include "handmade.h"
 
 struct Backbuffer
 {
-	// NOTE(bruno): Pixels are always 32-bits wide, Memory Order BB GG RR XX
+	// NOTE(casey): Pixels are always 32-bits wide, Memory Order BB GG RR XX
 	SDL_Texture *texture;
 	void *memory;
 	int width;
@@ -64,10 +67,7 @@ struct WindowDimension
 struct SoundOutput
 {
 	int sampleRate;
-	int toneHz;
-	int toneVolume;
 	uint32 runningSampleIndex;
-	int wavePeriod;
 	int bytesPerSample;
 	int secondaryBufferSize;
 	int latencySampleCount;
@@ -299,6 +299,16 @@ internal void FillSoundBuffer(SoundOutput *soundOutput, int byteToLock,
 	}
 }
 
+internal void SDLProcessControllerButton(GameButtonState *oldState,
+										 GameButtonState *newState,
+										 SDL_GameController *controllerHandle,
+										 SDL_GameControllerButton button)
+{
+	newState->endedDown = SDL_GameControllerGetButton(controllerHandle, button);
+	newState->halfTransitionCount =
+		(oldState->endedDown != newState->endedDown) ? 1 : 0;
+}
+
 int main(int argc, char *argv[])
 {
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC |
@@ -313,26 +323,19 @@ int main(int argc, char *argv[])
 		480, SDL_WINDOW_RESIZABLE);
 	if (window)
 	{
-		SDL_Renderer *renderer =
-			SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
+		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 
 		if (renderer)
 		{
 			WindowDimension dimension = GetWindowDimension(window);
 			SDLResizeTexture(&globalBackbuffer, renderer, dimension.width,
 							 dimension.height);
-			int xOffset = 0;
-			int yOffset = 0;
 
 			bool soundPlaying = false;
 
 			SoundOutput soundOutput = {};
 			soundOutput.sampleRate = 48000;
-			soundOutput.toneHz = 256;
-			soundOutput.toneVolume = 3000;
 			soundOutput.runningSampleIndex = 0;
-			soundOutput.wavePeriod =
-				soundOutput.sampleRate / soundOutput.toneHz;
 			soundOutput.bytesPerSample = sizeof(int16) * 2;
 			soundOutput.secondaryBufferSize =
 				soundOutput.sampleRate * soundOutput.bytesPerSample;
@@ -347,6 +350,10 @@ int main(int argc, char *argv[])
 
 			uint64 lastCounter = SDL_GetPerformanceCounter();
 			uint64 lastCycleCount = _rdtsc();
+
+			GameInput inputs[2] = {};
+			GameInput *newInput = &inputs[0];
+			GameInput *oldInput = &inputs[1];
 
 			globalRunning = true;
 			while (globalRunning)
@@ -366,9 +373,15 @@ int main(int argc, char *argv[])
 					SDL_GameController *controller =
 						ControllerHandles[controllerIndex];
 
+					GameControllerInput *oldController =
+						&oldInput->controllers[controllerIndex];
+					GameControllerInput *newController =
+						&newInput->controllers[controllerIndex];
+
 					if (controller != NULL &&
 						SDL_GameControllerGetAttached(controller))
 					{
+						// TODO(bruno): finish processing all buttons
 						bool up = SDL_GameControllerGetButton(
 							controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
 						bool down = SDL_GameControllerGetButton(
@@ -381,37 +394,77 @@ int main(int argc, char *argv[])
 							controller, SDL_CONTROLLER_BUTTON_START);
 						bool back = SDL_GameControllerGetButton(
 							controller, SDL_CONTROLLER_BUTTON_BACK);
-						bool leftShoulder = SDL_GameControllerGetButton(
-							controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-						bool rightShoulder = SDL_GameControllerGetButton(
-							controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
-						bool aButton = SDL_GameControllerGetButton(
+
+						// shoulder buttons
+						SDLProcessControllerButton(
+							&oldController->leftShoulder,
+							&newController->leftShoulder, controller,
+							SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+						SDLProcessControllerButton(
+							&oldController->rightShoulder,
+							&newController->rightShoulder, controller,
+							SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+
+						// A, B, X, Y
+						SDLProcessControllerButton(
+							&oldController->down, &newController->down,
 							controller, SDL_CONTROLLER_BUTTON_A);
-						bool bButton = SDL_GameControllerGetButton(
+						SDLProcessControllerButton(
+							&oldController->right, &newController->right,
 							controller, SDL_CONTROLLER_BUTTON_B);
-						bool xButton = SDL_GameControllerGetButton(
+						SDLProcessControllerButton(
+							&oldController->left, &newController->left,
 							controller, SDL_CONTROLLER_BUTTON_X);
-						bool yButton = SDL_GameControllerGetButton(
-							controller, SDL_CONTROLLER_BUTTON_Y);
+						SDLProcessControllerButton(
+							&oldController->up, &newController->up, controller,
+							SDL_CONTROLLER_BUTTON_Y);
+
+						newController->isAnalog = true;
+						newController->startX = oldController->endX;
+						newController->startY = oldController->endY;
 
 						int16 stickX = SDL_GameControllerGetAxis(
 							controller, SDL_CONTROLLER_AXIS_LEFTX);
 						int16 stickY = SDL_GameControllerGetAxis(
 							controller, SDL_CONTROLLER_AXIS_LEFTY);
 
-						xOffset += stickX / 4096;
-						yOffset += stickY / 4096;
-
-						soundOutput.toneHz =
-							512 + (int)(256.0f * ((real32)stickY / 30000.0f));
-						soundOutput.wavePeriod =
-							soundOutput.sampleRate / soundOutput.toneHz;
-
-						SDL_Haptic *haptic = RumbleHandles[controllerIndex];
-						if (bButton && haptic)
+						if (stickX < 0)
 						{
-							SDL_HapticRumblePlay(haptic, 0.5f, 2000);
+							newController->endX = stickX / 32768.0f;
 						}
+						else
+						{
+							newController->endX = stickX / 32767.0f;
+						}
+
+						// TODO(bruno): not setting up min and max properly yet
+						// because we are not polling more than once per frame.
+						// revisit this later if needed.
+						newController->minX = newController->maxX =
+							newController->endX;
+
+						if (stickY < 0)
+						{
+							newController->endY = stickY / 32768.0f;
+						}
+						else
+						{
+							newController->endY = stickY / 32767.0f;
+						}
+
+						// TODO(bruno): not setting up min and max properly yet
+						// because we are not polling more than once per frame.
+						// revisit this later if needed.
+						newController->minY = newController->maxY =
+							newController->endY;
+
+						// TODO(bruno): implement rumble (or maybe just remove
+						// it entirely) SDL_Haptic *haptic =
+						// RumbleHandles[controllerIndex]; if (bButton &&
+						// haptic)
+						// {
+						// 	SDL_HapticRumblePlay(haptic, 0.5f, 2000);
+						// }
 					}
 				}
 
@@ -450,8 +503,8 @@ int main(int argc, char *argv[])
 				gameBackbuffer.height = globalBackbuffer.height;
 				gameBackbuffer.pitch = globalBackbuffer.pitch;
 				gameBackbuffer.memory = globalBackbuffer.memory;
-				GameUpdateAndRender(&gameBackbuffer, xOffset, yOffset,
-									&gameSoundBuffer, soundOutput.toneHz);
+				GameUpdateAndRender(newInput, &gameBackbuffer,
+									&gameSoundBuffer);
 
 				FillSoundBuffer(&soundOutput, byteToLock, BytesToWrite,
 								&gameSoundBuffer);
@@ -469,18 +522,25 @@ int main(int argc, char *argv[])
 				int64 cyclesElapsed = endCycleCount - lastCycleCount;
 				int32 MCPF = (int32)(cyclesElapsed / (1000 * 1000));
 
-				printf("%0.2fms/f,  %0.2f/s,  %dmc/f\n", msPerFrame, fps, MCPF);
+				printf("%0.2fms/f,  %0.2ffps,  %dmc/f\n", msPerFrame, fps,
+					   MCPF);
 				lastCounter = endCounter;
+				lastCycleCount = endCycleCount;
+
+				GameInput *temp = oldInput;
+				oldInput = newInput;
+				newInput = temp;
+				// TODO(casey): should we clear this here?
 			}
 		}
 		else
 		{
-			// TODO(bruno): Logging
+			// TODO(casey): Logging
 		}
 	}
 	else
 	{
-		// TODO(bruno): Logging
+		// TODO(casey): Logging
 	}
 
 	// TODO(bruno): maybe we should close the controllers and rumble handles on
