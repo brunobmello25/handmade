@@ -33,7 +33,7 @@ case $PLATFORM in
         ;;
     "sdl")
         echo "Compiling SDL version..."
-        bear -- c++ ../code/sdl_handmade.cpp -o handmade -g `sdl2-config --cflags --libs`
+        bear -- c++ -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 ../code/sdl_handmade.cpp -o handmade -g `sdl2-config --cflags --libs` -Wall
         ;;
     "linux")
         echo "Compiling raw X11 version..."

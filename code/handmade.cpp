@@ -52,19 +52,27 @@ internal void RenderWeirdGradient(GameBackBuffer *backbuffer, int BlueOffset,
 	}
 }
 
-internal void GameUpdateAndRender(GameInput *gameInput,
+internal void GameUpdateAndRender(GameMemory *memory, GameInput *gameInput,
 								  GameBackBuffer *backBuffer,
 								  GameSoundBuffer *soundBuffer)
 {
-	local_persist int blueOffset = 0;
-	local_persist int greenOffset = 0;
-	local_persist int toneHz = 256;
+	assert(sizeof(GameState) <= memory->permanentStorageSize);
+
+	GameState *gameState = (GameState *)memory->permanentStorage;
+	if (!memory->isInitialized)
+	{
+		gameState->toneHz = 256;
+
+		// TOOD(casey): might be more appropriate to do this bool initialized
+		// variable in the platform layer
+		memory->isInitialized = true;
+	}
 
 	GameControllerInput input0 = gameInput->controllers[0];
 	if (input0.isAnalog)
 	{
-		blueOffset += (int)4.0f * (input0.endX);
-		toneHz = 256 + (int)(128.0f * (input0.endY));
+		gameState->blueOffset += (int)4.0f * (input0.endX);
+		gameState->toneHz = 256 + (int)(128.0f * (input0.endY));
 	}
 	else
 	{
@@ -72,12 +80,13 @@ internal void GameUpdateAndRender(GameInput *gameInput,
 
 	if (input0.down.endedDown)
 	{
-		greenOffset += 1;
+		gameState->greenOffset += 1;
 	}
 
 	// TODO(casey): allow sampleoffsets here
-	GameOutputSound(soundBuffer, toneHz);
-	RenderWeirdGradient(backBuffer, blueOffset, greenOffset);
+	GameOutputSound(soundBuffer, gameState->toneHz);
+	RenderWeirdGradient(backBuffer, gameState->blueOffset,
+						gameState->greenOffset);
 }
 #define HANDMADE_CPP
 #endif

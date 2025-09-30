@@ -5,10 +5,6 @@
 #include <stdio.h>
 #include <sys/mman.h>
 
-// TODO(casey): swap, min, max macros, maybe?
-
-#define Pi32 3.14159265359f
-
 // TODO(bruno): estudar mmap
 
 // NOTE: MAP_ANONYMOUS is not defined on Mac OS X and some other UNIX systems.
@@ -142,9 +138,6 @@ bool HandleEvent(SDL_Event *event)
 			{
 				case SDL_WINDOWEVENT_SIZE_CHANGED:
 				{
-					SDL_Window *window =
-						SDL_GetWindowFromID(event->window.windowID);
-					SDL_Renderer *renderer = SDL_GetRenderer(window);
 					printf("SDL_WINDOWEVENT_SIZE_CHANGED (%d, %d)\n",
 						   event->window.data1, event->window.data2);
 				}
@@ -172,11 +165,6 @@ bool HandleEvent(SDL_Event *event)
 		case SDL_KEYUP:
 		{
 			SDL_Keycode keycode = event->key.keysym.sym;
-			bool wasDown = false;
-			if (event->key.state == SDL_RELEASED)
-				wasDown = true;
-			else if (event->key.repeat != 0)
-				wasDown = true;
 			if (keycode == SDLK_w)
 				printf("w\n");
 		};
@@ -330,206 +318,230 @@ int main(int argc, char *argv[])
 			SDLResizeTexture(&globalBackbuffer, renderer, dimension.width,
 							 dimension.height);
 
-			bool soundPlaying = false;
+#if HANDMADE_INTERNAL
+			void *baseAddress = (void *)Terabytes((uint64)2);
+#else
+			void *baseAddress = (void *)0;
+#endif
+			GameMemory gameMemory = {};
 
-			SoundOutput soundOutput = {};
-			soundOutput.sampleRate = 48000;
-			soundOutput.runningSampleIndex = 0;
-			soundOutput.bytesPerSample = sizeof(int16) * 2;
-			soundOutput.secondaryBufferSize =
-				soundOutput.sampleRate * soundOutput.bytesPerSample;
-			soundOutput.latencySampleCount = soundOutput.sampleRate / 15;
-			soundOutput.tSine = 0.0f;
+			gameMemory.transientStorageSize = Gigabytes((uint64)4);
+			gameMemory.permanentStorageSize = Megabytes(64);
+			uint64 totalSize = gameMemory.transientStorageSize +
+							   gameMemory.permanentStorageSize;
 
-			InitializeAudio(soundOutput.sampleRate,
-							soundOutput.secondaryBufferSize);
-			int16 *samples = (int16 *)calloc(soundOutput.sampleRate,
-											 soundOutput.bytesPerSample);
-			SDL_PauseAudio(0);
+			gameMemory.permanentStorage =
+				mmap(baseAddress, totalSize, PROT_READ | PROT_WRITE,
+					 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+			gameMemory.transientStorage = (uint8 *)gameMemory.permanentStorage +
+										  gameMemory.permanentStorageSize;
 
-			uint64 lastCounter = SDL_GetPerformanceCounter();
-			uint64 lastCycleCount = _rdtsc();
-
-			GameInput inputs[2] = {};
-			GameInput *newInput = &inputs[0];
-			GameInput *oldInput = &inputs[1];
-
-			globalRunning = true;
-			while (globalRunning)
+			if (gameMemory.permanentStorage && gameMemory.transientStorage)
 			{
-				SDL_Event event;
-				while (SDL_PollEvent(&event))
+				SoundOutput soundOutput = {};
+				soundOutput.sampleRate = 48000;
+				soundOutput.runningSampleIndex = 0;
+				soundOutput.bytesPerSample = sizeof(int16) * 2;
+				soundOutput.secondaryBufferSize =
+					soundOutput.sampleRate * soundOutput.bytesPerSample;
+				soundOutput.latencySampleCount = soundOutput.sampleRate / 15;
+				soundOutput.tSine = 0.0f;
+
+				InitializeAudio(soundOutput.sampleRate,
+								soundOutput.secondaryBufferSize);
+				int16 *samples = (int16 *)calloc(soundOutput.sampleRate,
+												 soundOutput.bytesPerSample);
+				SDL_PauseAudio(0);
+
+				uint64 lastCounter = SDL_GetPerformanceCounter();
+				uint64 lastCycleCount = _rdtsc();
+
+				GameInput inputs[2] = {};
+				GameInput *newInput = &inputs[0];
+				GameInput *oldInput = &inputs[1];
+
+				globalRunning = true;
+				while (globalRunning)
 				{
-					if (HandleEvent(&event))
+					SDL_Event event;
+					while (SDL_PollEvent(&event))
 					{
-						globalRunning = false;
+						if (HandleEvent(&event))
+						{
+							globalRunning = false;
+						}
 					}
-				}
 
-				for (int controllerIndex = 0; controllerIndex < MAX_CONTROLLERS;
-					 controllerIndex++)
-				{
-					SDL_GameController *controller =
-						ControllerHandles[controllerIndex];
-
-					GameControllerInput *oldController =
-						&oldInput->controllers[controllerIndex];
-					GameControllerInput *newController =
-						&newInput->controllers[controllerIndex];
-
-					if (controller != NULL &&
-						SDL_GameControllerGetAttached(controller))
+					for (int controllerIndex = 0;
+						 controllerIndex < MAX_CONTROLLERS; controllerIndex++)
 					{
-						// TODO(bruno): finish processing all buttons
-						bool up = SDL_GameControllerGetButton(
-							controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
-						bool down = SDL_GameControllerGetButton(
-							controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-						bool left = SDL_GameControllerGetButton(
-							controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-						bool right = SDL_GameControllerGetButton(
-							controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
-						bool start = SDL_GameControllerGetButton(
-							controller, SDL_CONTROLLER_BUTTON_START);
-						bool back = SDL_GameControllerGetButton(
-							controller, SDL_CONTROLLER_BUTTON_BACK);
+						SDL_GameController *controller =
+							ControllerHandles[controllerIndex];
 
-						// shoulder buttons
-						SDLProcessControllerButton(
-							&oldController->leftShoulder,
-							&newController->leftShoulder, controller,
-							SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-						SDLProcessControllerButton(
-							&oldController->rightShoulder,
-							&newController->rightShoulder, controller,
-							SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+						GameControllerInput *oldController =
+							&oldInput->controllers[controllerIndex];
+						GameControllerInput *newController =
+							&newInput->controllers[controllerIndex];
 
-						// A, B, X, Y
-						SDLProcessControllerButton(
-							&oldController->down, &newController->down,
-							controller, SDL_CONTROLLER_BUTTON_A);
-						SDLProcessControllerButton(
-							&oldController->right, &newController->right,
-							controller, SDL_CONTROLLER_BUTTON_B);
-						SDLProcessControllerButton(
-							&oldController->left, &newController->left,
-							controller, SDL_CONTROLLER_BUTTON_X);
-						SDLProcessControllerButton(
-							&oldController->up, &newController->up, controller,
-							SDL_CONTROLLER_BUTTON_Y);
-
-						newController->isAnalog = true;
-						newController->startX = oldController->endX;
-						newController->startY = oldController->endY;
-
-						int16 stickX = SDL_GameControllerGetAxis(
-							controller, SDL_CONTROLLER_AXIS_LEFTX);
-						int16 stickY = SDL_GameControllerGetAxis(
-							controller, SDL_CONTROLLER_AXIS_LEFTY);
-
-						if (stickX < 0)
+						if (controller != NULL &&
+							SDL_GameControllerGetAttached(controller))
 						{
-							newController->endX = stickX / 32768.0f;
-						}
-						else
-						{
-							newController->endX = stickX / 32767.0f;
-						}
+							// TODO(bruno): finish processing all buttons
+							// bool up = SDL_GameControllerGetButton(
+							// 	controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
+							// bool down = SDL_GameControllerGetButton(
+							// 	controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+							// bool left = SDL_GameControllerGetButton(
+							// 	controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+							// bool right = SDL_GameControllerGetButton(
+							// 	controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+							// bool start = SDL_GameControllerGetButton(
+							// 	controller, SDL_CONTROLLER_BUTTON_START);
+							// bool back = SDL_GameControllerGetButton(
+							// 	controller, SDL_CONTROLLER_BUTTON_BACK);
 
-						// TODO(bruno): not setting up min and max properly yet
-						// because we are not polling more than once per frame.
-						// revisit this later if needed.
-						newController->minX = newController->maxX =
-							newController->endX;
+							// shoulder buttons
+							SDLProcessControllerButton(
+								&oldController->leftShoulder,
+								&newController->leftShoulder, controller,
+								SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+							SDLProcessControllerButton(
+								&oldController->rightShoulder,
+								&newController->rightShoulder, controller,
+								SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
 
-						if (stickY < 0)
-						{
-							newController->endY = stickY / 32768.0f;
+							// A, B, X, Y
+							SDLProcessControllerButton(
+								&oldController->down, &newController->down,
+								controller, SDL_CONTROLLER_BUTTON_A);
+							SDLProcessControllerButton(
+								&oldController->right, &newController->right,
+								controller, SDL_CONTROLLER_BUTTON_B);
+							SDLProcessControllerButton(
+								&oldController->left, &newController->left,
+								controller, SDL_CONTROLLER_BUTTON_X);
+							SDLProcessControllerButton(
+								&oldController->up, &newController->up,
+								controller, SDL_CONTROLLER_BUTTON_Y);
+
+							newController->isAnalog = true;
+							newController->startX = oldController->endX;
+							newController->startY = oldController->endY;
+
+							int16 stickX = SDL_GameControllerGetAxis(
+								controller, SDL_CONTROLLER_AXIS_LEFTX);
+							int16 stickY = SDL_GameControllerGetAxis(
+								controller, SDL_CONTROLLER_AXIS_LEFTY);
+
+							if (stickX < 0)
+							{
+								newController->endX = stickX / 32768.0f;
+							}
+							else
+							{
+								newController->endX = stickX / 32767.0f;
+							}
+
+							// TODO(bruno): not setting up min and max properly
+							// yet because we are not polling more than once per
+							// frame. revisit this later if needed.
+							newController->minX = newController->maxX =
+								newController->endX;
+
+							if (stickY < 0)
+							{
+								newController->endY = stickY / 32768.0f;
+							}
+							else
+							{
+								newController->endY = stickY / 32767.0f;
+							}
+
+							// TODO(bruno): not setting up min and max properly
+							// yet because we are not polling more than once per
+							// frame. revisit this later if needed.
+							newController->minY = newController->maxY =
+								newController->endY;
+
+							// TODO(bruno): implement rumble (or maybe just
+							// remove it entirely) SDL_Haptic *haptic =
+							// RumbleHandles[controllerIndex]; if (bButton &&
+							// haptic)
+							// {
+							// 	SDL_HapticRumblePlay(haptic, 0.5f, 2000);
+							// }
 						}
-						else
-						{
-							newController->endY = stickY / 32767.0f;
-						}
-
-						// TODO(bruno): not setting up min and max properly yet
-						// because we are not polling more than once per frame.
-						// revisit this later if needed.
-						newController->minY = newController->maxY =
-							newController->endY;
-
-						// TODO(bruno): implement rumble (or maybe just remove
-						// it entirely) SDL_Haptic *haptic =
-						// RumbleHandles[controllerIndex]; if (bButton &&
-						// haptic)
-						// {
-						// 	SDL_HapticRumblePlay(haptic, 0.5f, 2000);
-						// }
 					}
-				}
 
-				// TODO(bruno): what in the actual skibidi whippy flying fuck
-				// is happening here
-				SDL_LockAudio();
-				int byteToLock = (soundOutput.runningSampleIndex *
-								  soundOutput.bytesPerSample) %
-								 soundOutput.secondaryBufferSize;
-				int targetCursor = ((globalAudioRingBuffer.playCursor +
-									 (soundOutput.latencySampleCount *
-									  soundOutput.bytesPerSample)) %
-									soundOutput.secondaryBufferSize);
+					// TODO(bruno): what in the actual skibidi whippy flying
+					// fuck is happening here
+					SDL_LockAudio();
+					int byteToLock = (soundOutput.runningSampleIndex *
+									  soundOutput.bytesPerSample) %
+									 soundOutput.secondaryBufferSize;
+					int targetCursor = ((globalAudioRingBuffer.playCursor +
+										 (soundOutput.latencySampleCount *
+										  soundOutput.bytesPerSample)) %
+										soundOutput.secondaryBufferSize);
 
-				int BytesToWrite;
-				if (byteToLock > targetCursor)
-				{
-					BytesToWrite =
-						(soundOutput.secondaryBufferSize - byteToLock);
-					BytesToWrite += targetCursor;
-				}
-				else
-				{
-					BytesToWrite = targetCursor - byteToLock;
-				}
-				SDL_UnlockAudio();
+					int BytesToWrite;
+					if (byteToLock > targetCursor)
+					{
+						BytesToWrite =
+							(soundOutput.secondaryBufferSize - byteToLock);
+						BytesToWrite += targetCursor;
+					}
+					else
+					{
+						BytesToWrite = targetCursor - byteToLock;
+					}
+					SDL_UnlockAudio();
 
-				GameSoundBuffer gameSoundBuffer = {};
-				gameSoundBuffer.sampleRate = soundOutput.sampleRate;
-				gameSoundBuffer.sampleCount =
-					BytesToWrite / soundOutput.bytesPerSample;
-				gameSoundBuffer.samples = samples;
+					GameSoundBuffer gameSoundBuffer = {};
+					gameSoundBuffer.sampleRate = soundOutput.sampleRate;
+					gameSoundBuffer.sampleCount =
+						BytesToWrite / soundOutput.bytesPerSample;
+					gameSoundBuffer.samples = samples;
 
-				GameBackBuffer gameBackbuffer = {};
-				gameBackbuffer.width = globalBackbuffer.width;
-				gameBackbuffer.height = globalBackbuffer.height;
-				gameBackbuffer.pitch = globalBackbuffer.pitch;
-				gameBackbuffer.memory = globalBackbuffer.memory;
-				GameUpdateAndRender(newInput, &gameBackbuffer,
+					GameBackBuffer gameBackbuffer = {};
+					gameBackbuffer.width = globalBackbuffer.width;
+					gameBackbuffer.height = globalBackbuffer.height;
+					gameBackbuffer.pitch = globalBackbuffer.pitch;
+					gameBackbuffer.memory = globalBackbuffer.memory;
+
+					GameUpdateAndRender(&gameMemory, newInput, &gameBackbuffer,
+										&gameSoundBuffer);
+
+					FillSoundBuffer(&soundOutput, byteToLock, BytesToWrite,
 									&gameSoundBuffer);
 
-				FillSoundBuffer(&soundOutput, byteToLock, BytesToWrite,
-								&gameSoundBuffer);
+					SDLUpdateWindow(window, renderer, globalBackbuffer);
 
-				SDLUpdateWindow(window, renderer, globalBackbuffer);
+					uint64 endCounter = SDL_GetPerformanceCounter();
+					uint64 counterElapsed = endCounter - lastCounter;
+					real64 msPerFrame = (((1000.0f * (real64)counterElapsed) /
+										  (real64)performanceFrequency));
+					real64 fps =
+						(real64)performanceFrequency / (real64)counterElapsed;
 
-				uint64 endCounter = SDL_GetPerformanceCounter();
-				uint64 counterElapsed = endCounter - lastCounter;
-				real64 msPerFrame = (((1000.0f * (real64)counterElapsed) /
-									  (real64)performanceFrequency));
-				real64 fps =
-					(real64)performanceFrequency / (real64)counterElapsed;
+					uint64 endCycleCount = _rdtsc();
+					int64 cyclesElapsed = endCycleCount - lastCycleCount;
+					int32 MCPF = (int32)(cyclesElapsed / (1000 * 1000));
 
-				uint64 endCycleCount = _rdtsc();
-				int64 cyclesElapsed = endCycleCount - lastCycleCount;
-				int32 MCPF = (int32)(cyclesElapsed / (1000 * 1000));
+					printf("%0.2fms/f,  %0.2ffps,  %dmc/f\n", msPerFrame, fps,
+						   MCPF);
+					lastCounter = endCounter;
+					lastCycleCount = endCycleCount;
 
-				printf("%0.2fms/f,  %0.2ffps,  %dmc/f\n", msPerFrame, fps,
-					   MCPF);
-				lastCounter = endCounter;
-				lastCycleCount = endCycleCount;
-
-				GameInput *temp = oldInput;
-				oldInput = newInput;
-				newInput = temp;
-				// TODO(casey): should we clear this here?
+					GameInput *temp = oldInput;
+					oldInput = newInput;
+					newInput = temp;
+					// TODO(casey): should we clear this here?
+				}
+			}
+			else
+			{
+				// TODO(casey): Logging
 			}
 		}
 		else
