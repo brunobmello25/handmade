@@ -330,6 +330,11 @@ int main(int argc, char *argv[])
 			uint64 totalSize = gameMemory.transientStorageSize +
 							   gameMemory.permanentStorageSize;
 
+			// TODO(bruno): consider touching all the pages to ensure that they
+			// are not lazy allocated later. Not sure if this is necessary,
+			// depends if the memory access may fail after initial allocation
+			// when accessed in the game or if it's guaranteed to work once this
+			// mmap call succeeds.
 			gameMemory.permanentStorage =
 				mmap(baseAddress, totalSize, PROT_READ | PROT_WRITE,
 					 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
