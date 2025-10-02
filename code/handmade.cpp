@@ -61,6 +61,14 @@ internal void GameUpdateAndRender(GameMemory *memory, GameInput *gameInput,
 	GameState *gameState = (GameState *)memory->permanentStorage;
 	if (!memory->isInitialized)
 	{
+		char *fileName = "test.bmp";
+
+		DEBUGReadFileResult fileResult = DEBUGPlatformReadEntireFile(fileName);
+		if (fileResult.contents)
+		{
+			DEBUGPlatformFreeFileMemory(fileResult.contents);
+		}
+
 		gameState->toneHz = 256;
 
 		// TOOD(casey): might be more appropriate to do this bool initialized

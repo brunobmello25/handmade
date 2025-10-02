@@ -115,7 +115,21 @@ internal void GameUpdateAndRender(GameMemory *memory, GameInput *gameInput,
 								  GameBackBuffer *backBuffer,
 								  GameSoundBuffer *soundBuffer);
 
-// TODO(casey): Services that the platform layer provides to the game
+// NOTE(casey): Services that the platform layer provides to the game
+
+#if HANDMADE_INTERNAL
+struct DEBUGReadFileResult
+{
+	uint32 contentsSize;
+	void *contents;
+};
+
+internal DEBUGReadFileResult DEBUGPlatformReadEntireFile(char *filename);
+internal void DEBUGPlatformFreeFileMemory(void *memory);
+
+internal bool DEBUGPlatformWriteEntireFile(char *filename, void *memory,
+										   uint32 size);
+#endif
 
 #define HANDMADE_H
 #endif

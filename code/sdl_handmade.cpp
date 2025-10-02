@@ -1,9 +1,13 @@
 #include <SDL.h>
 #include <SDL_audio.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 // TODO(bruno): estudar mmap
 
@@ -84,6 +88,87 @@ WindowDimension GetWindowDimension(SDL_Window *window)
 	SDL_GetWindowSize(window, &result.width, &result.height);
 
 	return (result);
+}
+
+inline uint32 SafeTruncateUInt64(uint64 Value)
+{
+	assert(Value <= 0xFFFFFFFF);
+	uint32 Result = (uint32)Value;
+	return (Result);
+}
+
+internal DEBUGReadFileResult DEBUGPlatformReadEntireFile(char *filename)
+{
+	DEBUGReadFileResult result = {};
+
+	int handle = open(filename, O_RDONLY);
+	if (handle == -1)
+	{
+		return result;
+	}
+
+	struct stat fileStat;
+	if (fstat(handle, &fileStat) == -1)
+	{
+		close(handle);
+		return result;
+	}
+	result.contentsSize = SafeTruncateUInt64(fileStat.st_size);
+	result.contents = malloc(result.contentsSize);
+	if (result.contents)
+	{
+		result.contentsSize = 0;
+		close(handle);
+		return result;
+	}
+
+	uint32 bytesToRead = result.contentsSize;
+	uint8 *at = (uint8 *)result.contents;
+	while (bytesToRead)
+	{
+		ssize_t bytesRead = read(handle, at, bytesToRead);
+		if (bytesRead == -1)
+		{
+			free(result.contents);
+			result.contents = 0;
+			result.contentsSize = 0;
+			close(handle);
+			return result;
+		}
+		bytesToRead -= bytesRead;
+		at += bytesRead;
+	}
+
+	close(handle);
+	return result;
+}
+
+internal void DEBUGPlatformFreeFileMemory(void *memory) { free(memory); }
+
+internal bool DEBUGPlatformWriteEntireFile(char *filename, void *memory,
+										   uint32 size)
+{
+	int handle = open(filename, O_WRONLY | O_CREAT,
+					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+	if (handle == -1)
+	{
+		return false;
+	}
+	uint32 bytesToWrite = size;
+	uint8 *at = (uint8 *)memory;
+	while (bytesToWrite)
+	{
+		ssize_t bytesWritten = write(handle, at, bytesToWrite);
+		if (bytesWritten == -1)
+		{
+			close(handle);
+			return false;
+		}
+		bytesToWrite -= bytesWritten;
+		at += bytesWritten;
+	}
+	close(handle);
+	return true;
 }
 
 internal void SDLResizeTexture(Backbuffer *buffer, SDL_Renderer *renderer,
