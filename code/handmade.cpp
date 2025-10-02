@@ -79,15 +79,15 @@ internal void GameUpdateAndRender(GameMemory *memory, GameInput *gameInput,
 	GameControllerInput input0 = gameInput->controllers[0];
 	if (input0.isAnalog)
 	{
-		// gameState->blueOffset += (int)4.0f * (input0.stickAverageX);
-		// gameState->toneHz = 256 + (int)(128.0f * (input0.stickAverageY));
+		gameState->blueOffset += (int)4.0f * (input0.stickAverageX);
+		gameState->toneHz = 256 + (int)(128.0f * (input0.stickAverageY));
 	}
 	else
 	{
-		// gameState->blueOffset +=
-		// 	(input0.moveRight.endedDown - input0.moveLeft.endedDown) * 4;
-		// gameState->toneHz =
-		// 	256 + (input0.moveUp.endedDown - input0.moveDown.endedDown) * 128;
+		gameState->blueOffset +=
+			(input0.moveRight.endedDown - input0.moveLeft.endedDown) * 4;
+		gameState->toneHz =
+			256 + (input0.moveUp.endedDown - input0.moveDown.endedDown) * 128;
 	}
 
 	// TODO(casey): allow sampleoffsets here

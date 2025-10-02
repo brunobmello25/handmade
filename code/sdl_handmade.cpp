@@ -1,5 +1,3 @@
-#include "SDL_gamecontroller.h"
-#include "handmade.h"
 #include <SDL.h>
 #include <SDL_audio.h>
 #include <fcntl.h>
@@ -179,16 +177,23 @@ internal void SDLResizeTexture(Backbuffer *buffer, SDL_Renderer *renderer,
 }
 
 internal void SDLUpdateWindow(SDL_Window *Window, SDL_Renderer *Renderer,
-							  Backbuffer Buffer)
+							  Backbuffer *Buffer)
 {
-	SDL_UpdateTexture(Buffer.texture, 0, Buffer.memory, Buffer.pitch);
+	SDL_UpdateTexture(Buffer->texture, 0, Buffer->memory, Buffer->pitch);
 
-	SDL_RenderCopy(Renderer, Buffer.texture, 0, 0);
+	SDL_RenderCopy(Renderer, Buffer->texture, 0, 0);
 
 	SDL_RenderPresent(Renderer);
 }
 
-bool HandleEvent(SDL_Event *event)
+internal void SDLProcessKeyPress(GameButtonState *newState, bool isDown)
+{
+	assert(newState->endedDown != isDown);
+	newState->endedDown = isDown;
+	++newState->halfTransitionCount;
+}
+
+bool HandleEvent(SDL_Event *event, GameControllerInput *newKeyboardController)
 {
 	bool shouldQuit = false;
 
@@ -201,12 +206,110 @@ bool HandleEvent(SDL_Event *event)
 		}
 		break;
 
+		case SDL_KEYDOWN:
+		case SDL_KEYUP:
+		{
+			SDL_Keycode keyCode = event->key.keysym.sym;
+			bool isDown = (event->key.state == SDL_PRESSED);
+			bool wasDown = false;
+			if (event->key.state == SDL_RELEASED)
+			{
+				wasDown = true;
+			}
+			else if (event->key.repeat != 0)
+			{
+				wasDown = true;
+			}
+
+			// NOTE: In the windows version, we used "if (IsDown != WasDown)"
+			// to detect key repeats. SDL has the 'repeat' value, though,
+			// which we'll use.
+			if (event->key.repeat == 0)
+			{
+				if (keyCode == SDLK_w)
+				{
+					SDLProcessKeyPress(&newKeyboardController->moveUp, isDown);
+				}
+				else if (keyCode == SDLK_a)
+				{
+					SDLProcessKeyPress(&newKeyboardController->moveLeft,
+									   isDown);
+				}
+				else if (keyCode == SDLK_s)
+				{
+					SDLProcessKeyPress(&newKeyboardController->moveDown,
+									   isDown);
+				}
+				else if (keyCode == SDLK_d)
+				{
+					SDLProcessKeyPress(&newKeyboardController->moveRight,
+									   isDown);
+				}
+				else if (keyCode == SDLK_q)
+				{
+					SDLProcessKeyPress(&newKeyboardController->leftShoulder,
+									   isDown);
+				}
+				else if (keyCode == SDLK_e)
+				{
+					SDLProcessKeyPress(&newKeyboardController->rightShoulder,
+									   isDown);
+				}
+				else if (keyCode == SDLK_UP)
+				{
+					SDLProcessKeyPress(&newKeyboardController->actionUp,
+									   isDown);
+				}
+				else if (keyCode == SDLK_LEFT)
+				{
+					SDLProcessKeyPress(&newKeyboardController->actionLeft,
+									   isDown);
+				}
+				else if (keyCode == SDLK_DOWN)
+				{
+					SDLProcessKeyPress(&newKeyboardController->actionDown,
+									   isDown);
+				}
+				else if (keyCode == SDLK_RIGHT)
+				{
+					SDLProcessKeyPress(&newKeyboardController->actionRight,
+									   isDown);
+				}
+				else if (keyCode == SDLK_ESCAPE)
+				{
+					printf("ESCAPE: ");
+					if (isDown)
+					{
+						printf("IsDown ");
+					}
+					if (wasDown)
+					{
+						printf("WasDown");
+					}
+					printf("\n");
+				}
+				else if (keyCode == SDLK_SPACE)
+				{
+				}
+			}
+
+			bool AltKeyWasDown = (event->key.keysym.mod & KMOD_ALT);
+			if (keyCode == SDLK_F4 && AltKeyWasDown)
+			{
+				shouldQuit = true;
+			}
+		}
+		break;
+
 		case SDL_WINDOWEVENT:
 		{
 			switch (event->window.event)
 			{
 				case SDL_WINDOWEVENT_SIZE_CHANGED:
 				{
+					SDL_Window *Window =
+						SDL_GetWindowFromID(event->window.windowID);
+					SDL_Renderer *Renderer = SDL_GetRenderer(Window);
 					printf("SDL_WINDOWEVENT_SIZE_CHANGED (%d, %d)\n",
 						   event->window.data1, event->window.data2);
 				}
@@ -220,27 +323,18 @@ bool HandleEvent(SDL_Event *event)
 
 				case SDL_WINDOWEVENT_EXPOSED:
 				{
-					SDL_Window *window =
+					SDL_Window *Window =
 						SDL_GetWindowFromID(event->window.windowID);
-					SDL_Renderer *renderer = SDL_GetRenderer(window);
-					SDLUpdateWindow(window, renderer, globalBackbuffer);
+					SDL_Renderer *Renderer = SDL_GetRenderer(Window);
+					SDLUpdateWindow(Window, Renderer, &globalBackbuffer);
 				}
 				break;
 			}
 		}
 		break;
-
-		case SDL_KEYDOWN:
-		case SDL_KEYUP:
-		{
-			SDL_Keycode keycode = event->key.keysym.sym;
-			if (keycode == SDLK_w)
-				printf("w\n");
-		};
-		break;
 	}
 
-	return (shouldQuit);
+	return shouldQuit;
 }
 
 void InitializeControllers()
@@ -267,6 +361,8 @@ void InitializeControllers()
 			SDL_HapticClose(haptic);
 			RumbleHandles[controllerIndex] = NULL;
 		}
+
+		controllerIndex++;
 	}
 }
 
@@ -320,9 +416,9 @@ internal void InitializeAudio(int32 sampleRate, int32 bufferSize)
 	}
 }
 
-internal void FillSoundBuffer(SoundOutput *soundOutput, int byteToLock,
-							  int bytesToWrite,
-							  GameSoundBuffer *gameSoundBuffer)
+internal void SDLFillSoundBuffer(SoundOutput *soundOutput, int byteToLock,
+								 int bytesToWrite,
+								 GameSoundBuffer *gameSoundBuffer)
 {
 	int16 *samples = gameSoundBuffer->samples;
 
@@ -375,11 +471,25 @@ internal float SDLProcessGameControllerAxisValue(int16 Value,
 }
 
 internal void SDLProcessControllerButton(GameButtonState *oldState,
-										 GameButtonState *newState, bool value)
+										 GameButtonState *newState, bool isDown)
 {
-	newState->endedDown = value;
+	newState->endedDown = isDown;
 	newState->halfTransitionCount +=
 		((newState->endedDown == oldState->endedDown) ? 0 : 1);
+}
+
+internal void SDLCloseGameControllers()
+{
+	for (int controllerIndex = 0; controllerIndex < MAX_CONTROLLERS;
+		 controllerIndex++)
+	{
+		if (ControllerHandles[controllerIndex])
+		{
+			if (RumbleHandles[controllerIndex])
+				SDL_HapticClose(RumbleHandles[controllerIndex]);
+			SDL_GameControllerClose(ControllerHandles[controllerIndex]);
+		}
+	}
 }
 
 int main(int argc, char *argv[])
@@ -400,9 +510,29 @@ int main(int argc, char *argv[])
 
 		if (renderer)
 		{
+			globalRunning = true;
 			WindowDimension dimension = GetWindowDimension(window);
 			SDLResizeTexture(&globalBackbuffer, renderer, dimension.width,
 							 dimension.height);
+
+			GameInput inputs[2] = {};
+			GameInput *newInput = &inputs[0];
+			GameInput *oldInput = &inputs[1];
+
+			SoundOutput soundOutput = {};
+			soundOutput.sampleRate = 48000;
+			soundOutput.runningSampleIndex = 0;
+			soundOutput.bytesPerSample = sizeof(int16) * 2;
+			soundOutput.secondaryBufferSize =
+				soundOutput.sampleRate * soundOutput.bytesPerSample;
+			soundOutput.latencySampleCount = soundOutput.sampleRate / 15;
+			soundOutput.tSine = 0.0f;
+
+			InitializeAudio(soundOutput.sampleRate,
+							soundOutput.secondaryBufferSize);
+			int16 *samples = (int16 *)calloc(soundOutput.sampleRate,
+											 soundOutput.bytesPerSample);
+			SDL_PauseAudio(0);
 
 #if HANDMADE_INTERNAL
 			void *baseAddress = (void *)Terabytes((uint64)2);
@@ -410,295 +540,261 @@ int main(int argc, char *argv[])
 			void *baseAddress = (void *)0;
 #endif
 			GameMemory gameMemory = {};
-
-			gameMemory.transientStorageSize = Gigabytes((uint64)4);
 			gameMemory.permanentStorageSize = Megabytes(64);
-			uint64 totalSize = gameMemory.transientStorageSize +
-							   gameMemory.permanentStorageSize;
+			gameMemory.transientStorageSize = Gigabytes((uint64)4);
 
-			// TODO(bruno): consider touching all the pages to ensure that they
-			// are not lazy allocated later. Not sure if this is necessary,
-			// depends if the memory access may fail after initial allocation
-			// when accessed in the game or if it's guaranteed to work once this
-			// mmap call succeeds.
+			uint64 totalStorageSize = gameMemory.transientStorageSize +
+									  gameMemory.permanentStorageSize;
+
+			// TODO(bruno): maybe touch all the pages to avoid lazy allocation.
 			gameMemory.permanentStorage =
-				mmap(baseAddress, totalSize, PROT_READ | PROT_WRITE,
+				mmap(baseAddress, totalStorageSize, PROT_READ | PROT_WRITE,
 					 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+			assert(gameMemory.permanentStorage);
 			gameMemory.transientStorage = (uint8 *)gameMemory.permanentStorage +
 										  gameMemory.permanentStorageSize;
 
-			if (gameMemory.permanentStorage && gameMemory.transientStorage)
+			uint64 lastCounter = SDL_GetPerformanceCounter();
+			uint64 lastCycleCount = _rdtsc();
+
+			while (globalRunning)
 			{
-				SoundOutput soundOutput = {};
-				soundOutput.sampleRate = 48000;
-				soundOutput.runningSampleIndex = 0;
-				soundOutput.bytesPerSample = sizeof(int16) * 2;
-				soundOutput.secondaryBufferSize =
-					soundOutput.sampleRate * soundOutput.bytesPerSample;
-				soundOutput.latencySampleCount = soundOutput.sampleRate / 15;
-				soundOutput.tSine = 0.0f;
-
-				InitializeAudio(soundOutput.sampleRate,
-								soundOutput.secondaryBufferSize);
-				int16 *samples = (int16 *)calloc(soundOutput.sampleRate,
-												 soundOutput.bytesPerSample);
-				SDL_PauseAudio(0);
-
-				uint64 lastCounter = SDL_GetPerformanceCounter();
-				uint64 lastCycleCount = _rdtsc();
-
-				GameInput inputs[2] = {};
-				GameInput *newInput = &inputs[0];
-				GameInput *oldInput = &inputs[1];
-
-				globalRunning = true;
-				while (globalRunning)
+				GameControllerInput *oldKeyboardController =
+					GetController(oldInput, 0);
+				GameControllerInput *newKeyboardController =
+					GetController(newInput, 0);
+				*newKeyboardController = {};
+				for (int buttonIndex = 0;
+					 buttonIndex < ArrayCount(newKeyboardController->buttons);
+					 buttonIndex++)
 				{
-					GameControllerInput *oldKeyboardController =
-						GetController(oldInput, 0);
-					GameControllerInput *newKeyboardController =
-						GetController(newInput, 0);
-					*newKeyboardController = {};
-					for (int buttonIndex = 0;
-						 buttonIndex <
-						 ArrayCount(newKeyboardController->buttons);
-						 buttonIndex++)
+					newKeyboardController->buttons[buttonIndex].endedDown =
+						oldKeyboardController->buttons[buttonIndex].endedDown;
+				}
+
+				SDL_Event event;
+				while (SDL_PollEvent(&event))
+				{
+					if (HandleEvent(&event, newKeyboardController))
 					{
-						newKeyboardController->buttons[buttonIndex].endedDown =
-							oldKeyboardController->buttons[buttonIndex]
-								.endedDown;
+						globalRunning = false;
 					}
+				}
 
-					SDL_Event event;
-					while (SDL_PollEvent(&event))
+				for (int controllerIndex = 0; controllerIndex < MAX_CONTROLLERS;
+					 controllerIndex++)
+				{
+					if (ControllerHandles[controllerIndex] != 0 &&
+						SDL_GameControllerGetAttached(
+							ControllerHandles[controllerIndex]))
 					{
-						if (HandleEvent(&event))
+						GameControllerInput *oldController =
+							GetController(oldInput, controllerIndex + 1);
+						GameControllerInput *newController =
+							GetController(newInput, controllerIndex + 1);
+
+						newController->isConnected = true;
+
+						bool up = SDL_GameControllerGetButton(
+							ControllerHandles[controllerIndex],
+							SDL_CONTROLLER_BUTTON_DPAD_UP);
+						bool down = SDL_GameControllerGetButton(
+							ControllerHandles[controllerIndex],
+							SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+						bool left = SDL_GameControllerGetButton(
+							ControllerHandles[controllerIndex],
+							SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+						bool right = SDL_GameControllerGetButton(
+							ControllerHandles[controllerIndex],
+							SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+						bool start = SDL_GameControllerGetButton(
+							ControllerHandles[controllerIndex],
+							SDL_CONTROLLER_BUTTON_START);
+						bool back = SDL_GameControllerGetButton(
+							ControllerHandles[controllerIndex],
+							SDL_CONTROLLER_BUTTON_BACK);
+
+						SDLProcessControllerButton(
+							&(oldController->leftShoulder),
+							&(newController->leftShoulder),
+							SDL_GameControllerGetButton(
+								ControllerHandles[controllerIndex],
+								SDL_CONTROLLER_BUTTON_LEFTSHOULDER));
+
+						SDLProcessControllerButton(
+							&(oldController->rightShoulder),
+							&(newController->rightShoulder),
+							SDL_GameControllerGetButton(
+								ControllerHandles[controllerIndex],
+								SDL_CONTROLLER_BUTTON_RIGHTSHOULDER));
+
+						SDLProcessControllerButton(
+							&(oldController->actionDown),
+							&(newController->actionDown),
+							SDL_GameControllerGetButton(
+								ControllerHandles[controllerIndex],
+								SDL_CONTROLLER_BUTTON_A));
+
+						SDLProcessControllerButton(
+							&(oldController->actionRight),
+							&(newController->actionRight),
+							SDL_GameControllerGetButton(
+								ControllerHandles[controllerIndex],
+								SDL_CONTROLLER_BUTTON_B));
+
+						SDLProcessControllerButton(
+							&(oldController->actionLeft),
+							&(newController->actionLeft),
+							SDL_GameControllerGetButton(
+								ControllerHandles[controllerIndex],
+								SDL_CONTROLLER_BUTTON_X));
+
+						SDLProcessControllerButton(
+							&(oldController->actionUp),
+							&(newController->actionUp),
+							SDL_GameControllerGetButton(
+								ControllerHandles[controllerIndex],
+								SDL_CONTROLLER_BUTTON_Y));
+
+						newController->stickAverageX =
+							SDLProcessGameControllerAxisValue(
+								SDL_GameControllerGetAxis(
+									ControllerHandles[controllerIndex],
+									SDL_CONTROLLER_AXIS_LEFTX),
+								1);
+						newController->stickAverageY =
+							-SDLProcessGameControllerAxisValue(
+								SDL_GameControllerGetAxis(
+									ControllerHandles[controllerIndex],
+									SDL_CONTROLLER_AXIS_LEFTY),
+								1);
+						if ((newController->stickAverageX != 0.0f) ||
+							(newController->stickAverageY != 0.0f))
 						{
-							globalRunning = false;
+							newController->isAnalog = true;
 						}
-					}
 
-					for (int controllerIndex = 0;
-						 controllerIndex < MAX_CONTROLLERS; controllerIndex++)
-					{
-						if (ControllerHandles[controllerIndex] != 0 &&
-							SDL_GameControllerGetAttached(
-								ControllerHandles[controllerIndex]))
+						if (SDL_GameControllerGetButton(
+								ControllerHandles[controllerIndex],
+								SDL_CONTROLLER_BUTTON_DPAD_UP))
 						{
-							SDL_GameController *controller =
-								ControllerHandles[controllerIndex];
-
-							GameControllerInput *oldController =
-								GetController(oldInput, controllerIndex + 1);
-							GameControllerInput *newController =
-								GetController(newInput, controllerIndex + 1);
-
-							newController->isConnected = true;
-
-							bool up = SDL_GameControllerGetButton(
-								ControllerHandles[controllerIndex],
-								SDL_CONTROLLER_BUTTON_DPAD_UP);
-							bool down = SDL_GameControllerGetButton(
-								ControllerHandles[controllerIndex],
-								SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-							bool left = SDL_GameControllerGetButton(
-								ControllerHandles[controllerIndex],
-								SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-							bool right = SDL_GameControllerGetButton(
-								ControllerHandles[controllerIndex],
-								SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
-							bool start = SDL_GameControllerGetButton(
-								ControllerHandles[controllerIndex],
-								SDL_CONTROLLER_BUTTON_START);
-							bool back = SDL_GameControllerGetButton(
-								ControllerHandles[controllerIndex],
-								SDL_CONTROLLER_BUTTON_BACK);
-
-							SDLProcessControllerButton(
-								&(oldController->leftShoulder),
-								&(newController->leftShoulder),
-								SDL_GameControllerGetButton(
-									ControllerHandles[controllerIndex],
-									SDL_CONTROLLER_BUTTON_LEFTSHOULDER));
-
-							SDLProcessControllerButton(
-								&(oldController->rightShoulder),
-								&(newController->rightShoulder),
-								SDL_GameControllerGetButton(
-									ControllerHandles[controllerIndex],
-									SDL_CONTROLLER_BUTTON_RIGHTSHOULDER));
-
-							SDLProcessControllerButton(
-								&(oldController->actionDown),
-								&(newController->actionDown),
-								SDL_GameControllerGetButton(
-									ControllerHandles[controllerIndex],
-									SDL_CONTROLLER_BUTTON_A));
-
-							SDLProcessControllerButton(
-								&(oldController->actionRight),
-								&(newController->actionRight),
-								SDL_GameControllerGetButton(
-									ControllerHandles[controllerIndex],
-									SDL_CONTROLLER_BUTTON_B));
-
-							SDLProcessControllerButton(
-								&(oldController->actionLeft),
-								&(newController->actionLeft),
-								SDL_GameControllerGetButton(
-									ControllerHandles[controllerIndex],
-									SDL_CONTROLLER_BUTTON_X));
-
-							SDLProcessControllerButton(
-								&(oldController->actionUp),
-								&(newController->actionUp),
-								SDL_GameControllerGetButton(
-									ControllerHandles[controllerIndex],
-									SDL_CONTROLLER_BUTTON_Y));
-
-							newController->stickAverageX =
-								SDLProcessGameControllerAxisValue(
-									SDL_GameControllerGetAxis(
-										ControllerHandles[controllerIndex],
-										SDL_CONTROLLER_AXIS_LEFTX),
-									1);
-							newController->stickAverageY =
-								-SDLProcessGameControllerAxisValue(
-									SDL_GameControllerGetAxis(
-										ControllerHandles[controllerIndex],
-										SDL_CONTROLLER_AXIS_LEFTY),
-									1);
-							if ((newController->stickAverageX != 0.0f) ||
-								(newController->stickAverageY != 0.0f))
-							{
-								newController->isAnalog = true;
-							}
-
-							if (SDL_GameControllerGetButton(
-									ControllerHandles[controllerIndex],
-									SDL_CONTROLLER_BUTTON_DPAD_UP))
-							{
-								newController->stickAverageY = 1.0f;
-								newController->isAnalog = false;
-							}
-
-							if (SDL_GameControllerGetButton(
-									ControllerHandles[controllerIndex],
-									SDL_CONTROLLER_BUTTON_DPAD_DOWN))
-							{
-								newController->stickAverageY = -1.0f;
-								newController->isAnalog = false;
-							}
-
-							if (SDL_GameControllerGetButton(
-									ControllerHandles[controllerIndex],
-									SDL_CONTROLLER_BUTTON_DPAD_LEFT))
-							{
-								newController->stickAverageX = -1.0f;
-								newController->isAnalog = false;
-							}
-
-							if (SDL_GameControllerGetButton(
-									ControllerHandles[controllerIndex],
-									SDL_CONTROLLER_BUTTON_DPAD_RIGHT))
-							{
-								newController->stickAverageX = 1.0f;
-								newController->isAnalog = false;
-							}
-
-							float Threshold = 0.5f;
-							SDLProcessControllerButton(
-								&(oldController->moveLeft),
-								&(newController->moveLeft),
-								newController->stickAverageX < -Threshold);
-							SDLProcessControllerButton(
-								&(oldController->moveRight),
-								&(newController->moveRight),
-								newController->stickAverageX > Threshold);
-							SDLProcessControllerButton(
-								&(oldController->moveUp),
-								&(newController->moveUp),
-								newController->stickAverageY < -Threshold);
-							SDLProcessControllerButton(
-								&(oldController->moveDown),
-								&(newController->moveDown),
-								newController->stickAverageY > Threshold);
+							newController->stickAverageY = 1.0f;
+							newController->isAnalog = false;
 						}
-						else
+
+						if (SDL_GameControllerGetButton(
+								ControllerHandles[controllerIndex],
+								SDL_CONTROLLER_BUTTON_DPAD_DOWN))
 						{
-							// TODO(bruno): controller not plugged in
+							newController->stickAverageY = -1.0f;
+							newController->isAnalog = false;
 						}
-					}
 
-					// TODO(bruno): what in the actual skibidi whippy flying
-					// fuck is happening here
-					SDL_LockAudio();
-					int byteToLock = (soundOutput.runningSampleIndex *
-									  soundOutput.bytesPerSample) %
-									 soundOutput.secondaryBufferSize;
-					int targetCursor = ((globalAudioRingBuffer.playCursor +
-										 (soundOutput.latencySampleCount *
-										  soundOutput.bytesPerSample)) %
-										soundOutput.secondaryBufferSize);
+						if (SDL_GameControllerGetButton(
+								ControllerHandles[controllerIndex],
+								SDL_CONTROLLER_BUTTON_DPAD_LEFT))
+						{
+							newController->stickAverageX = -1.0f;
+							newController->isAnalog = false;
+						}
 
-					int BytesToWrite;
-					if (byteToLock > targetCursor)
-					{
-						BytesToWrite =
-							(soundOutput.secondaryBufferSize - byteToLock);
-						BytesToWrite += targetCursor;
+						if (SDL_GameControllerGetButton(
+								ControllerHandles[controllerIndex],
+								SDL_CONTROLLER_BUTTON_DPAD_RIGHT))
+						{
+							newController->stickAverageX = 1.0f;
+							newController->isAnalog = false;
+						}
+
+						float Threshold = 0.5f;
+						SDLProcessControllerButton(
+							&(oldController->moveLeft),
+							&(newController->moveLeft),
+							newController->stickAverageX < -Threshold);
+						SDLProcessControllerButton(
+							&(oldController->moveRight),
+							&(newController->moveRight),
+							newController->stickAverageX > Threshold);
+						SDLProcessControllerButton(
+							&(oldController->moveUp), &(newController->moveUp),
+							newController->stickAverageY < -Threshold);
+						SDLProcessControllerButton(
+							&(oldController->moveDown),
+							&(newController->moveDown),
+							newController->stickAverageY > Threshold);
 					}
 					else
 					{
-						BytesToWrite = targetCursor - byteToLock;
+						// TODO(bruno): controller not plugged in
 					}
-					SDL_UnlockAudio();
+				}
 
-					GameSoundBuffer gameSoundBuffer = {};
-					gameSoundBuffer.sampleRate = soundOutput.sampleRate;
-					gameSoundBuffer.sampleCount =
-						BytesToWrite / soundOutput.bytesPerSample;
-					gameSoundBuffer.samples = samples;
+				// TODO(bruno): what in the actual skibidi whippy flying
+				// fuck is happening here
+				SDL_LockAudio();
+				int byteToLock = (soundOutput.runningSampleIndex *
+								  soundOutput.bytesPerSample) %
+								 soundOutput.secondaryBufferSize;
+				int targetCursor = ((globalAudioRingBuffer.playCursor +
+									 (soundOutput.latencySampleCount *
+									  soundOutput.bytesPerSample)) %
+									soundOutput.secondaryBufferSize);
 
-					GameBackBuffer gameBackbuffer = {};
-					gameBackbuffer.width = globalBackbuffer.width;
-					gameBackbuffer.height = globalBackbuffer.height;
-					gameBackbuffer.pitch = globalBackbuffer.pitch;
-					gameBackbuffer.memory = globalBackbuffer.memory;
+				int BytesToWrite;
+				if (byteToLock > targetCursor)
+				{
+					BytesToWrite =
+						(soundOutput.secondaryBufferSize - byteToLock);
+					BytesToWrite += targetCursor;
+				}
+				else
+				{
+					BytesToWrite = targetCursor - byteToLock;
+				}
+				SDL_UnlockAudio();
 
-					GameUpdateAndRender(&gameMemory, newInput, &gameBackbuffer,
-										&gameSoundBuffer);
+				GameSoundBuffer gameSoundBuffer = {};
+				gameSoundBuffer.sampleRate = soundOutput.sampleRate;
+				gameSoundBuffer.sampleCount =
+					BytesToWrite / soundOutput.bytesPerSample;
+				gameSoundBuffer.samples = samples;
 
-					FillSoundBuffer(&soundOutput, byteToLock, BytesToWrite,
+				GameBackBuffer gameBackbuffer = {};
+				gameBackbuffer.width = globalBackbuffer.width;
+				gameBackbuffer.height = globalBackbuffer.height;
+				gameBackbuffer.pitch = globalBackbuffer.pitch;
+				gameBackbuffer.memory = globalBackbuffer.memory;
+
+				GameUpdateAndRender(&gameMemory, newInput, &gameBackbuffer,
 									&gameSoundBuffer);
 
-					SDLUpdateWindow(window, renderer, globalBackbuffer);
+				GameInput *temp = oldInput;
+				oldInput = newInput;
+				newInput = temp;
 
-					uint64 endCounter = SDL_GetPerformanceCounter();
-					uint64 counterElapsed = endCounter - lastCounter;
-					double msPerFrame = (((1000.0f * (double)counterElapsed) /
-										  (double)performanceFrequency));
-					double fps =
-						(double)performanceFrequency / (double)counterElapsed;
+				SDLFillSoundBuffer(&soundOutput, byteToLock, BytesToWrite,
+								   &gameSoundBuffer);
 
-					uint64 endCycleCount = _rdtsc();
-					int64 cyclesElapsed = endCycleCount - lastCycleCount;
-					int32 MCPF = (int32)(cyclesElapsed / (1000 * 1000));
+				SDLUpdateWindow(window, renderer, &globalBackbuffer);
 
-					printf("%0.2fms/f,  %0.2ffps,  %dmc/f\n", msPerFrame, fps,
-						   MCPF);
-					lastCounter = endCounter;
-					lastCycleCount = endCycleCount;
+				uint64 endCycleCount = _rdtsc();
+				uint64 endCounter = SDL_GetPerformanceCounter();
+				uint64 counterElapsed = endCounter - lastCounter;
+				double msPerFrame = (((1000.0f * (double)counterElapsed) /
+									  (double)performanceFrequency));
+				double fps =
+					(double)performanceFrequency / (double)counterElapsed;
 
-					GameInput *temp = oldInput;
-					oldInput = newInput;
-					newInput = temp;
-					// TODO(casey): should we clear this here?
-				}
-			}
-			else
-			{
-				// TODO(casey): Logging
+				int64 cyclesElapsed = endCycleCount - lastCycleCount;
+				int32 MCPF = (int32)(cyclesElapsed / (1000 * 1000));
+
+				printf("%0.2fms/f,  %0.2ffps,  %dmc/f\n", msPerFrame, fps,
+					   MCPF);
+				lastCounter = endCounter;
+				lastCycleCount = endCycleCount;
+
+				// TODO(casey): should we clear this here?
 			}
 		}
 		else
@@ -715,6 +811,7 @@ int main(int argc, char *argv[])
 	// exit. or maybe not, since the OS should take care of that when the
 	// process ends.
 	// TODO(bruno): same for audio.
+	SDLCloseGameControllers();
 	SDL_Quit();
 	return (0);
 }
