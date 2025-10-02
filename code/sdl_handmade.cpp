@@ -19,25 +19,7 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-#define internal static
-#define local_persist static
-#define global_variable static
-
-typedef int8_t int8;
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
-
-typedef uint8_t uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
-typedef float real32;
-typedef double real64;
-
 #include "handmade.cpp"
-#include "handmade.h"
 
 struct Backbuffer
 {
@@ -70,7 +52,7 @@ struct SoundOutput
 	int bytesPerSample;
 	int secondaryBufferSize;
 	int latencySampleCount;
-	real32 tSine;
+	float tSine;
 };
 
 global_variable Backbuffer globalBackbuffer;
@@ -609,10 +591,10 @@ int main(int argc, char *argv[])
 
 					uint64 endCounter = SDL_GetPerformanceCounter();
 					uint64 counterElapsed = endCounter - lastCounter;
-					real64 msPerFrame = (((1000.0f * (real64)counterElapsed) /
-										  (real64)performanceFrequency));
-					real64 fps =
-						(real64)performanceFrequency / (real64)counterElapsed;
+					double msPerFrame = (((1000.0f * (double)counterElapsed) /
+										  (double)performanceFrequency));
+					double fps =
+						(double)performanceFrequency / (double)counterElapsed;
 
 					uint64 endCycleCount = _rdtsc();
 					int64 cyclesElapsed = endCycleCount - lastCycleCount;

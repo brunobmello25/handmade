@@ -1,4 +1,5 @@
 #if !defined(HANDMADE_H)
+#include "handmade_defines.h"
 
 #define Pi32 3.14159265359f
 
@@ -59,17 +60,17 @@ struct GameControllerInput
 {
 	bool isAnalog;
 
-	real32 startX;
-	real32 startY;
+	float startX;
+	float startY;
 
-	real32 minX;
-	real32 minY;
+	float minX;
+	float minY;
 
-	real32 maxX;
-	real32 maxY;
+	float maxX;
+	float maxY;
 
-	real32 endX;
-	real32 endY;
+	float endX;
+	float endY;
 
 	union
 	{
