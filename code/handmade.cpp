@@ -61,7 +61,7 @@ internal void GameUpdateAndRender(GameMemory *memory, GameInput *gameInput,
 	GameState *gameState = (GameState *)memory->permanentStorage;
 	if (!memory->isInitialized)
 	{
-		char *fileName = "test.bmp";
+		const char *fileName = "test.bmp";
 
 		DEBUGReadFileResult fileResult = DEBUGPlatformReadEntireFile(fileName);
 		if (fileResult.contents)

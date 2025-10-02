@@ -58,31 +58,35 @@ struct GameButtonState
 
 struct GameControllerInput
 {
+	bool isConnected;
 	bool isAnalog;
 
-	float startX;
-	float startY;
-
-	float minX;
-	float minY;
-
-	float maxX;
-	float maxY;
-
-	float endX;
-	float endY;
+	float stickAverageX;
+	float stickAverageY;
 
 	union
 	{
-		GameButtonState buttons[6];
+		GameButtonState buttons[12];
 		struct
 		{
-			GameButtonState up;
-			GameButtonState down;
-			GameButtonState left;
-			GameButtonState right;
+			GameButtonState moveUp;
+			GameButtonState moveDown;
+			GameButtonState moveLeft;
+			GameButtonState moveRight;
+
+			GameButtonState actionUp;
+			GameButtonState actionDown;
+			GameButtonState actionLeft;
+			GameButtonState actionRight;
+
 			GameButtonState leftShoulder;
 			GameButtonState rightShoulder;
+
+			GameButtonState back;
+			GameButtonState start;
+
+			// NOTE(casey): All buttons must be added above this line
+			GameButtonState terminator;
 		};
 	};
 };
@@ -116,6 +120,15 @@ internal void GameUpdateAndRender(GameMemory *memory, GameInput *gameInput,
 								  GameBackBuffer *backBuffer,
 								  GameSoundBuffer *soundBuffer);
 
+inline GameControllerInput *GetController(GameInput *input,
+										  int unsigned controllerIndex)
+{
+	assert(controllerIndex < ArrayCount(input->controllers));
+
+	GameControllerInput *result = &input->controllers[controllerIndex];
+	return result;
+}
+
 // NOTE(casey): Services that the platform layer provides to the game
 
 #if HANDMADE_INTERNAL
@@ -125,7 +138,7 @@ struct DEBUGReadFileResult
 	void *contents;
 };
 
-internal DEBUGReadFileResult DEBUGPlatformReadEntireFile(char *filename);
+internal DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename);
 internal void DEBUGPlatformFreeFileMemory(void *memory);
 
 internal bool DEBUGPlatformWriteEntireFile(char *filename, void *memory,
