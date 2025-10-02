@@ -606,7 +606,7 @@ int main(int argc, char *argv[])
 								newController->isAnalog = false;
 							}
 
-							real32 Threshold = 0.5f;
+							float Threshold = 0.5f;
 							SDLProcessControllerButton(
 								&(oldController->moveLeft),
 								&(newController->moveLeft),
