@@ -12,7 +12,7 @@
 
 internal void GameOutputSound(GameSoundBuffer *soundBuffer, int toneHz)
 {
-	local_persist real32 tSine;
+	local_persist float tSine;
 	int16 toneVolume = 3000;
 	int wavePeriod = soundBuffer->sampleRate / toneHz;
 
@@ -21,12 +21,12 @@ internal void GameOutputSound(GameSoundBuffer *soundBuffer, int toneHz)
 	for (int SampleIndex = 0; SampleIndex < soundBuffer->sampleCount;
 		 ++SampleIndex)
 	{
-		real32 sineValue = sinf(tSine);
+		float sineValue = sinf(tSine);
 		int16 sampleValue = (int16)(sineValue * toneVolume);
 		*samples++ = sampleValue;
 		*samples++ = sampleValue;
 
-		tSine += 2.0f * Pi32 * 1.0f / (real32)wavePeriod;
+		tSine += 2.0f * Pi32 * 1.0f / (float)wavePeriod;
 	}
 }
 
@@ -61,6 +61,14 @@ internal void GameUpdateAndRender(GameMemory *memory, GameInput *gameInput,
 	GameState *gameState = (GameState *)memory->permanentStorage;
 	if (!memory->isInitialized)
 	{
+		char *fileName = "test.bmp";
+
+		DEBUGReadFileResult fileResult = DEBUGPlatformReadEntireFile(fileName);
+		if (fileResult.contents)
+		{
+			DEBUGPlatformFreeFileMemory(fileResult.contents);
+		}
+
 		gameState->toneHz = 256;
 
 		// TOOD(casey): might be more appropriate to do this bool initialized
