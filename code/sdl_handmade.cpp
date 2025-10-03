@@ -556,7 +556,7 @@ int main(int argc, char *argv[])
 										  gameMemory.permanentStorageSize;
 
 			uint64 lastCounter = SDL_GetPerformanceCounter();
-			uint64 lastCycleCount = _rdtsc();
+			uint64 lastCycleCount = __rdtsc();
 
 			while (globalRunning)
 			{
@@ -778,7 +778,7 @@ int main(int argc, char *argv[])
 
 				SDLUpdateWindow(window, renderer, &globalBackbuffer);
 
-				uint64 endCycleCount = _rdtsc();
+				uint64 endCycleCount = __rdtsc();
 				uint64 endCounter = SDL_GetPerformanceCounter();
 				uint64 counterElapsed = endCounter - lastCounter;
 				double msPerFrame = (((1000.0f * (double)counterElapsed) /
