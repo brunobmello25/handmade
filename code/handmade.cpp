@@ -69,7 +69,7 @@ internal void GameUpdateAndRender(GameMemory *memory, GameInput *input,
 		memory->isInitialized = true;
 	}
 
-	for (int controllerIndex = 0;
+	for (size_t controllerIndex = 0;
 		 controllerIndex < ArrayCount(input->controllers); ++controllerIndex)
 	{
 		GameControllerInput *controller = GetController(input, controllerIndex);

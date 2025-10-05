@@ -342,9 +342,6 @@ bool HandleEvent(SDL_Event *event, GameControllerInput *newKeyboardController)
 			{
 				case SDL_WINDOWEVENT_SIZE_CHANGED:
 				{
-					SDL_Window *window =
-						SDL_GetWindowFromID(event->window.windowID);
-					SDL_Renderer *renderer = SDL_GetRenderer(window);
 					printf("SDL_WINDOWEVENT_SIZE_CHANGED (%d, %d)\n",
 						   event->window.data1, event->window.data2);
 				}
@@ -562,7 +559,7 @@ int main(int argc, char *argv[])
 									  gameMemory.transientStorageSize;
 
 			gameMemory.permanentStorage =
-				mmap(0, totalStorageSize, PROT_READ | PROT_WRITE,
+				mmap(baseAddress, totalStorageSize, PROT_READ | PROT_WRITE,
 					 MAP_ANON | MAP_PRIVATE, -1, 0);
 
 			assert(gameMemory.permanentStorage);
@@ -580,7 +577,7 @@ int main(int argc, char *argv[])
 				GameControllerInput *newKeyboardController =
 					GetController(newInput, 0);
 				*newKeyboardController = {};
-				for (int buttonIndex = 0;
+				for (size_t buttonIndex = 0;
 					 buttonIndex < ArrayCount(newKeyboardController->buttons);
 					 ++buttonIndex)
 				{
