@@ -514,12 +514,14 @@ int main(int argc, char *argv[])
 		480, SDL_WINDOW_RESIZABLE);
 	if (window)
 	{
+		// Create a "renderer" for our window.
+		SDL_Renderer *renderer =
+			SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
+
 		int monitorRefreshRate = SDLGetWindowRefreshRate(window);
 		int gameUpdateHz = monitorRefreshRate / 2;
-		real32 targetSecondsPerFrame = 1.0f / gameUpdateHz;
+		real32 targetSecondsPerFrame = 1.0f / (real32)gameUpdateHz;
 
-		// Create a "renderer" for our window.
-		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 		if (renderer)
 		{
 			bool running = true;
@@ -537,7 +539,7 @@ int main(int argc, char *argv[])
 			soundOutput.bytesPerSample = sizeof(int16) * 2;
 			soundOutput.secondaryBufferSize =
 				soundOutput.samplesPerSecond * soundOutput.bytesPerSample;
-			soundOutput.latencySampleCount = soundOutput.samplesPerSecond / 30;
+			soundOutput.latencySampleCount = soundOutput.samplesPerSecond / 15;
 			// Open our audio device:
 			SDLInitAudio(48000, soundOutput.secondaryBufferSize);
 			// NOTE: calloc() allocates memory and clears it to zero. It accepts
@@ -568,6 +570,7 @@ int main(int argc, char *argv[])
 			gameMemory.transientStorage =
 				(uint8 *)(gameMemory.permanentStorage) +
 				gameMemory.permanentStorageSize;
+
 			uint64 lastCounter = SDL_GetPerformanceCounter();
 			uint64 lastCycleCount = _rdtsc();
 			while (running)
@@ -787,23 +790,20 @@ int main(int argc, char *argv[])
 				SDLFillSoundBuffer(&soundOutput, byteToLock, bytesToWrite,
 								   &soundBuffer);
 
-				SDLUpdateWindow(window, renderer, &GlobalBackbuffer);
-				uint64 endCycleCount = _rdtsc();
-				uint64 endCounter = SDL_GetPerformanceCounter();
-				uint64 cyclesElapsed = endCycleCount - lastCycleCount;
-				uint64 counterElapsed = endCounter - lastCounter;
-
 				if (SDLGetSecondsElapsed(lastCounter,
 										 SDL_GetPerformanceCounter()) <
 					targetSecondsPerFrame)
 				{
-					uint32 TimeToSleep =
+					int32 TimeToSleep =
 						((targetSecondsPerFrame -
 						  SDLGetSecondsElapsed(lastCounter,
 											   SDL_GetPerformanceCounter())) *
 						 1000) -
 						1;
-					SDL_Delay(TimeToSleep);
+					if (TimeToSleep > 0)
+					{
+						SDL_Delay(TimeToSleep);
+					}
 					assert(
 						SDLGetSecondsElapsed(lastCounter,
 											 SDL_GetPerformanceCounter()) <
@@ -814,6 +814,15 @@ int main(int argc, char *argv[])
 						// Waiting...
 					}
 				}
+
+				// Get this before SDLUpdateWindow() so that we don't keep
+				// missing VBlanks.
+				uint64 endCounter = SDL_GetPerformanceCounter();
+
+				SDLUpdateWindow(window, renderer, &GlobalBackbuffer);
+				uint64 endCycleCount = _rdtsc();
+				uint64 cyclesElapsed = endCycleCount - lastCycleCount;
+				uint64 counterElapsed = endCounter - lastCounter;
 
 				real64 msPerFrame = (((1000.0f * (real64)counterElapsed) /
 									  (real64)perfCountFrequency));
