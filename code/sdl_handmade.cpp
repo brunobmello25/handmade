@@ -477,6 +477,30 @@ internal void SDLCloseGameControllers()
 	}
 }
 
+internal int SDLGetWindowRefreshRate(SDL_Window *window)
+{
+	int displayIndex = SDL_GetWindowDisplayIndex(window);
+	SDL_DisplayMode mode;
+	int defaultRefreshRate = 60;
+
+	if (SDL_GetDesktopDisplayMode(displayIndex, &mode) != 0)
+	{
+		return defaultRefreshRate;
+	}
+
+	if (mode.refresh_rate == 0)
+	{
+		return defaultRefreshRate;
+	}
+
+	return mode.refresh_rate;
+}
+
+internal real32 SDLGetSecondsElapsed(uint64 oldCounter, uint64 currentCounter)
+{
+	return ((real32)(currentCounter - oldCounter) /
+			(real32)SDL_GetPerformanceFrequency());
+}
 int main(int argc, char *argv[])
 {
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC |
@@ -490,6 +514,10 @@ int main(int argc, char *argv[])
 		480, SDL_WINDOW_RESIZABLE);
 	if (window)
 	{
+		int monitorRefreshRate = SDLGetWindowRefreshRate(window);
+		int gameUpdateHz = monitorRefreshRate / 2;
+		real32 targetSecondsPerFrame = 1.0f / gameUpdateHz;
+
 		// Create a "renderer" for our window.
 		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 		if (renderer)
@@ -762,8 +790,30 @@ int main(int argc, char *argv[])
 				SDLUpdateWindow(window, renderer, &GlobalBackbuffer);
 				uint64 endCycleCount = _rdtsc();
 				uint64 endCounter = SDL_GetPerformanceCounter();
-				uint64 counterElapsed = endCounter - lastCounter;
 				uint64 cyclesElapsed = endCycleCount - lastCycleCount;
+				uint64 counterElapsed = endCounter - lastCounter;
+
+				if (SDLGetSecondsElapsed(lastCounter,
+										 SDL_GetPerformanceCounter()) <
+					targetSecondsPerFrame)
+				{
+					uint32 TimeToSleep =
+						((targetSecondsPerFrame -
+						  SDLGetSecondsElapsed(lastCounter,
+											   SDL_GetPerformanceCounter())) *
+						 1000) -
+						1;
+					SDL_Delay(TimeToSleep);
+					assert(
+						SDLGetSecondsElapsed(lastCounter,
+											 SDL_GetPerformanceCounter()) <
+						targetSecondsPerFrame) while (SDLGetSecondsElapsed(lastCounter,
+																		   SDL_GetPerformanceCounter()) <
+													  targetSecondsPerFrame)
+					{
+						// Waiting...
+					}
+				}
 
 				real64 msPerFrame = (((1000.0f * (real64)counterElapsed) /
 									  (real64)perfCountFrequency));
