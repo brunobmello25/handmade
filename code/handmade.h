@@ -1,49 +1,41 @@
 #if !defined(HANDMADE_H)
-/* ========================================================================
-   $File: $
-   $Date: $
-   $Revision: $
-   $Creator: Casey Muratori $
-   $Notice: (C) Copyright 2014 by Molly Rocket, Inc. All Rights Reserved. $
-   ======================================================================== */
-
 /*
   NOTE(casey):
 
   HANDMADE_INTERNAL:
-	0 - Build for public release
-	1 - Build for developer only
+		0 - Build for public release
+		1 - Build for developer only
 
   HANDMADE_SLOW:
-	0 - Not slow code allowed!
-	1 - Slow code welcome.
+		0 - Not slow code allowed!
+		1 - Slow code welcome.
 */
 
 #if HANDMADE_SLOW
 // TODO(casey): Complete assertion macro - don't worry everyone!
-#define Assert(Expression)                                                     \
+#define assert(Expression)                                                     \
 	if (!(Expression))                                                         \
 	{                                                                          \
 		*(int *)0 = 0;                                                         \
 	}
 #else
-#define Assert(Expression)
+#define assert(Expression)
 #endif
 
-#define Kilobytes(Value) ((Value) * 1024LL)
-#define Megabytes(Value) (Kilobytes(Value) * 1024LL)
-#define Gigabytes(Value) (Megabytes(Value) * 1024LL)
-#define Terabytes(Value) (Gigabytes(Value) * 1024LL)
+#define Kilobytes(value) ((value) * 1024LL)
+#define Megabytes(value) (Kilobytes(value) * 1024LL)
+#define Gigabytes(value) (Megabytes(value) * 1024LL)
+#define Terabytes(value) (Gigabytes(value) * 1024LL)
 
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 // TODO(casey): swap, min, max ... macros???
 
-inline uint32 SafeTruncateUInt64(uint64 Value)
+inline uint32 SafeTruncateUInt64(uint64 value)
 {
 	// TODO(casey): Defines for maximum values
-	Assert(Value <= 0xFFFFFFFF);
-	uint32 Result = (uint32)Value;
-	return (Result);
+	assert(value <= 0xFFFFFFFF);
+	uint32 result = (uint32)value;
+	return (result);
 }
 
 /*
@@ -55,15 +47,15 @@ inline uint32 SafeTruncateUInt64(uint64 Value)
    These are NOT for doing anything in the shipping game - they are
    blocking and the write doesn't protect against lost data!
 */
-struct debug_read_file_result
+struct DebugReadFileResult
 {
-	uint32 ContentsSize;
-	void *Contents;
+	uint32 contentsSize;
+	void *contents;
 };
-internal debug_read_file_result DEBUGPlatformReadEntireFile(char *Filename);
-internal void DEBUGPlatformFreeFileMemory(void *Memory);
-internal bool32 DEBUGPlatformWriteEntireFile(char *Filename, uint32 MemorySize,
-											 void *Memory);
+internal DebugReadFileResult DEBUGPlatformReadEntireFile(char *filename);
+internal void DEBUGPlatformFreeFileMemory(void *memory);
+internal bool32 DEBUGPlatformWriteEntireFile(char *filename, uint32 memorySize,
+											 void *memory);
 #endif
 
 /*
@@ -76,103 +68,103 @@ internal bool32 DEBUGPlatformWriteEntireFile(char *Filename, uint32 MemorySize,
 
 // TODO(casey): In the future, rendering _specifically_ will become a
 // three-tiered abstraction!!!
-struct game_offscreen_buffer
+struct GameOffscreenBuffer
 {
-	// NOTE(casey): Pixels are alwasy 32-bits wide, Memory Order BB GG RR XX
-	void *Memory;
-	int Width;
-	int Height;
-	int Pitch;
+	// NOTE(casey): Pixels are alwasy 32-bits wide, memory Order BB GG RR XX
+	void *memory;
+	int width;
+	int height;
+	int pitch;
 };
 
-struct game_sound_output_buffer
+struct GameSoundOutputBuffer
 {
-	int SamplesPerSecond;
-	int SampleCount;
-	int16 *Samples;
+	int samplesPerSecond;
+	int sampleCount;
+	int16 *samples;
 };
 
-struct game_button_state
+struct GameButtonState
 {
-	int HalfTransitionCount;
-	bool32 EndedDown;
+	int halfTransitionCount;
+	bool32 endedDown;
 };
 
-struct game_controller_input
+struct GameControllerInput
 {
-	bool32 IsConnected;
-	bool32 IsAnalog;
-	real32 StickAverageX;
-	real32 StickAverageY;
+	bool32 isConnected;
+	bool32 isAnalog;
+	real32 stickAverageX;
+	real32 stickAverageY;
 
 	union
 	{
-		game_button_state Buttons[12];
+		GameButtonState buttons[12];
 		struct
 		{
-			game_button_state MoveUp;
-			game_button_state MoveDown;
-			game_button_state MoveLeft;
-			game_button_state MoveRight;
+			GameButtonState moveUp;
+			GameButtonState moveDown;
+			GameButtonState moveLeft;
+			GameButtonState moveRight;
 
-			game_button_state ActionUp;
-			game_button_state ActionDown;
-			game_button_state ActionLeft;
-			game_button_state ActionRight;
+			GameButtonState actionUp;
+			GameButtonState actionDown;
+			GameButtonState actionLeft;
+			GameButtonState actionRight;
 
-			game_button_state LeftShoulder;
-			game_button_state RightShoulder;
+			GameButtonState leftShoulder;
+			GameButtonState rightShoulder;
 
-			game_button_state Back;
-			game_button_state Start;
+			GameButtonState back;
+			GameButtonState start;
 
 			// NOTE(casey): All buttons must be added above this line
 
-			game_button_state Terminator;
+			GameButtonState terminator;
 		};
 	};
 };
 
-struct game_input
+struct GameInput
 {
 	// TODO(casey): Insert clock values here.
-	game_controller_input Controllers[5];
+	GameControllerInput controllers[5];
 };
-inline game_controller_input *GetController(game_input *Input,
-											int unsigned ControllerIndex)
+inline GameControllerInput *GetController(GameInput *input,
+										  int unsigned controllerIndex)
 {
-	Assert(ControllerIndex < ArrayCount(Input->Controllers));
+	assert(controllerIndex < ArrayCount(input->controllers));
 
-	game_controller_input *Result = &Input->Controllers[ControllerIndex];
-	return (Result);
+	GameControllerInput *result = &input->controllers[controllerIndex];
+	return (result);
 }
 
-struct game_memory
+struct GameMemory
 {
-	bool32 IsInitialized;
+	bool32 isInitialized;
 
-	uint64 PermanentStorageSize;
-	void *PermanentStorage; // NOTE(casey): REQUIRED to be cleared to zero at
+	uint64 permanentStorageSize;
+	void *permanentStorage; // NOTE(casey): REQUIRED to be cleared to zero at
 							// startup
 
-	uint64 TransientStorageSize;
-	void *TransientStorage; // NOTE(casey): REQUIRED to be cleared to zero at
+	uint64 transientStorageSize;
+	void *transientStorage; // NOTE(casey): REQUIRED to be cleared to zero at
 							// startup
 };
 
-internal void GameUpdateAndRender(game_memory *Memory, game_input *Input,
-								  game_offscreen_buffer *Buffer,
-								  game_sound_output_buffer *SoundBuffer);
+internal void GameUpdateAndRender(GameMemory *memory, GameInput *input,
+								  GameOffscreenBuffer *buffer,
+								  GameSoundOutputBuffer *soundBuffer);
 
 //
 //
 //
 
-struct game_state
+struct GameState
 {
-	int ToneHz;
-	int GreenOffset;
-	int BlueOffset;
+	int toneHz;
+	int greenOffset;
+	int blueOffset;
 };
 
 #define HANDMADE_H

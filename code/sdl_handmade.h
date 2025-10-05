@@ -1,36 +1,36 @@
 #if !defined(SDL_HANDMADE_H)
 
-struct sdl_offscreen_buffer
+struct SdlOffscreenBuffer
 {
-	// NOTE(casey): Pixels are alwasy 32-bits wide, Memory Order BB GG RR XX
-	SDL_Texture *Texture;
-	void *Memory;
-	int Width;
-	int Height;
-	int Pitch;
+	// NOTE(casey): Pixels are alwasy 32-bits wide, memory Order BB GG RR XX
+	SDL_Texture *texture;
+	void *memory;
+	int width;
+	int height;
+	int pitch;
 };
 
-struct sdl_window_dimension
+struct SdlWindowDimension
 {
-	int Width;
-	int Height;
+	int width;
+	int height;
 };
 
-struct sdl_audio_ring_buffer
+struct SdlAudioRingBuffer
 {
-	int Size;
-	int WriteCursor;
-	int PlayCursor;
-	void *Data;
+	int size;
+	int writeCursor;
+	int playCursor;
+	void *data;
 };
 
-struct sdl_sound_output
+struct SdlSoundOutput
 {
-	int SamplesPerSecond;
-	uint32 RunningSampleIndex;
-	int BytesPerSample;
-	int SecondaryBufferSize;
-	int LatencySampleCount;
+	int samplesPerSecond;
+	uint32 runningSampleIndex;
+	int bytesPerSample;
+	int secondaryBufferSize;
+	int latencySampleCount;
 };
 
 #define SDL_HANDMADE_H
