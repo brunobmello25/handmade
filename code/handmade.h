@@ -1,149 +1,179 @@
 #if !defined(HANDMADE_H)
-#include "handmade_defines.h"
-
-#define Pi32 3.14159265359f
+/* ========================================================================
+   $File: $
+   $Date: $
+   $Revision: $
+   $Creator: Casey Muratori $
+   $Notice: (C) Copyright 2014 by Molly Rocket, Inc. All Rights Reserved. $
+   ======================================================================== */
 
 /*
- * NOTE(casey):
- *
- * HANDMADE_INTERNAL:
- *	0 - Build for public release
- *	1 - Build for developer only
- *
- * HANDMADE_SLOW:
- *	0 - No slow code allowed!
- *	1 - Slow code welcome!
- * */
+  NOTE(casey):
+
+  HANDMADE_INTERNAL:
+	0 - Build for public release
+	1 - Build for developer only
+
+  HANDMADE_SLOW:
+	0 - Not slow code allowed!
+	1 - Slow code welcome.
+*/
 
 #if HANDMADE_SLOW
-#define assert(expression)                                                     \
-	if (!(expression))                                                         \
+// TODO(casey): Complete assertion macro - don't worry everyone!
+#define Assert(Expression)                                                     \
+	if (!(Expression))                                                         \
 	{                                                                          \
-		(*(int *)0 = 0);                                                       \
+		*(int *)0 = 0;                                                         \
 	}
 #else
-#define assert(expression)
+#define Assert(Expression)
 #endif
 
-// TODO(casey): swap, min, max macros, maybe?
-#define Kilobytes(value) ((value) * 1024)
-#define Megabytes(value) (Kilobytes(value) * 1024)
-#define Gigabytes(value) (Megabytes(value) * 1024)
-#define Terabytes(value) (Gigabytes(value) * 1024)
+#define Kilobytes(Value) ((Value) * 1024LL)
+#define Megabytes(Value) (Kilobytes(Value) * 1024LL)
+#define Gigabytes(Value) (Megabytes(Value) * 1024LL)
+#define Terabytes(Value) (Gigabytes(Value) * 1024LL)
 
-#define ArrayCount(array) (sizeof(array) / sizeof((array)[0]))
+#define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
+// TODO(casey): swap, min, max ... macros???
 
-// NOTE(casey): Services that the game provider to the platform layer
-
-struct GameBackBuffer
+inline uint32 SafeTruncateUInt64(uint64 Value)
 {
-	void *memory;
-	int width;
-	int height;
-	int pitch;
+	// TODO(casey): Defines for maximum values
+	Assert(Value <= 0xFFFFFFFF);
+	uint32 Result = (uint32)Value;
+	return (Result);
+}
+
+/*
+  NOTE(casey): Services that the platform layer provides to the game
+*/
+#if HANDMADE_INTERNAL
+/* IMPORTANT(casey):
+
+   These are NOT for doing anything in the shipping game - they are
+   blocking and the write doesn't protect against lost data!
+*/
+struct debug_read_file_result
+{
+	uint32 ContentsSize;
+	void *Contents;
+};
+internal debug_read_file_result DEBUGPlatformReadEntireFile(char *Filename);
+internal void DEBUGPlatformFreeFileMemory(void *Memory);
+internal bool32 DEBUGPlatformWriteEntireFile(char *Filename, uint32 MemorySize,
+											 void *Memory);
+#endif
+
+/*
+  NOTE(casey): Services that the game provides to the platform layer.
+  (this may expand in the future - sound on separate thread, etc.)
+*/
+
+// FOUR THINGS - timing, controller/keyboard input, bitmap buffer to use, sound
+// buffer to use
+
+// TODO(casey): In the future, rendering _specifically_ will become a
+// three-tiered abstraction!!!
+struct game_offscreen_buffer
+{
+	// NOTE(casey): Pixels are alwasy 32-bits wide, Memory Order BB GG RR XX
+	void *Memory;
+	int Width;
+	int Height;
+	int Pitch;
 };
 
-struct GameSoundBuffer
+struct game_sound_output_buffer
 {
-	int sampleRate;
-	int sampleCount;
-	int16 *samples;
+	int SamplesPerSecond;
+	int SampleCount;
+	int16 *Samples;
 };
 
-struct GameButtonState
+struct game_button_state
 {
-	int halfTransitionCount;
-	bool endedDown;
+	int HalfTransitionCount;
+	bool32 EndedDown;
 };
 
-struct GameControllerInput
+struct game_controller_input
 {
-	bool isConnected;
-	bool isAnalog;
-
-	float stickAverageX;
-	float stickAverageY;
+	bool32 IsConnected;
+	bool32 IsAnalog;
+	real32 StickAverageX;
+	real32 StickAverageY;
 
 	union
 	{
-		GameButtonState buttons[12];
+		game_button_state Buttons[12];
 		struct
 		{
-			GameButtonState moveUp;
-			GameButtonState moveDown;
-			GameButtonState moveLeft;
-			GameButtonState moveRight;
+			game_button_state MoveUp;
+			game_button_state MoveDown;
+			game_button_state MoveLeft;
+			game_button_state MoveRight;
 
-			GameButtonState actionUp;
-			GameButtonState actionDown;
-			GameButtonState actionLeft;
-			GameButtonState actionRight;
+			game_button_state ActionUp;
+			game_button_state ActionDown;
+			game_button_state ActionLeft;
+			game_button_state ActionRight;
 
-			GameButtonState leftShoulder;
-			GameButtonState rightShoulder;
+			game_button_state LeftShoulder;
+			game_button_state RightShoulder;
 
-			GameButtonState back;
-			GameButtonState start;
+			game_button_state Back;
+			game_button_state Start;
 
 			// NOTE(casey): All buttons must be added above this line
-			GameButtonState terminator;
+
+			game_button_state Terminator;
 		};
 	};
 };
 
-struct GameInput
+struct game_input
 {
-	GameControllerInput controllers[4];
+	// TODO(casey): Insert clock values here.
+	game_controller_input Controllers[5];
 };
-
-struct GameState
+inline game_controller_input *GetController(game_input *Input,
+											int unsigned ControllerIndex)
 {
-	int toneHz;
-	int greenOffset;
-	int blueOffset;
-};
+	Assert(ControllerIndex < ArrayCount(Input->Controllers));
 
-struct GameMemory
-{
-	bool isInitialized;
-	uint64 permanentStorageSize;
-	void *permanentStorage; // NOTE(casey): REQUIRED to be cleared to zero at
-							// startup
-	uint64 transientStorageSize;
-	void *transientStorage; // NOTE(casey): REQUIRED to be cleared to
-							// zero at startup
-};
-
-internal void GameOutputSound(GameSoundBuffer *soundBuffer,
-							  int sampleCountToOutput);
-internal void GameUpdateAndRender(GameMemory *memory, GameInput *gameInput,
-								  GameBackBuffer *backBuffer,
-								  GameSoundBuffer *soundBuffer);
-
-inline GameControllerInput *GetController(GameInput *input,
-										  int unsigned controllerIndex)
-{
-	assert(controllerIndex < ArrayCount(input->controllers));
-
-	GameControllerInput *result = &input->controllers[controllerIndex];
-	return result;
+	game_controller_input *Result = &Input->Controllers[ControllerIndex];
+	return (Result);
 }
 
-// NOTE(casey): Services that the platform layer provides to the game
-
-#if HANDMADE_INTERNAL
-struct DEBUGReadFileResult
+struct game_memory
 {
-	uint32 contentsSize;
-	void *contents;
+	bool32 IsInitialized;
+
+	uint64 PermanentStorageSize;
+	void *PermanentStorage; // NOTE(casey): REQUIRED to be cleared to zero at
+							// startup
+
+	uint64 TransientStorageSize;
+	void *TransientStorage; // NOTE(casey): REQUIRED to be cleared to zero at
+							// startup
 };
 
-internal DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename);
-internal void DEBUGPlatformFreeFileMemory(void *memory);
+internal void GameUpdateAndRender(game_memory *Memory, game_input *Input,
+								  game_offscreen_buffer *Buffer,
+								  game_sound_output_buffer *SoundBuffer);
 
-internal bool DEBUGPlatformWriteEntireFile(char *filename, void *memory,
-										   uint32 size);
-#endif
+//
+//
+//
+
+struct game_state
+{
+	int ToneHz;
+	int GreenOffset;
+	int BlueOffset;
+};
 
 #define HANDMADE_H
 #endif
