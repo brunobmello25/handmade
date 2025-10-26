@@ -317,49 +317,12 @@ int main(int argc, char *argv[])
 					{
 						// NOTE: We have a controller with index
 						// ControllerIndex.
-						bool Up = SDL_GameControllerGetButton(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_BUTTON_DPAD_UP);
-						bool Down = SDL_GameControllerGetButton(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-						bool Left = SDL_GameControllerGetButton(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-						bool Right = SDL_GameControllerGetButton(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
-						bool Start = SDL_GameControllerGetButton(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_BUTTON_START);
-						bool Back = SDL_GameControllerGetButton(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_BUTTON_BACK);
-						bool LeftShoulder = SDL_GameControllerGetButton(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-						bool RightShoulder = SDL_GameControllerGetButton(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
 						bool aButton = SDL_GameControllerGetButton(
 							controllerHandles[controllerIndex],
 							SDL_CONTROLLER_BUTTON_A);
 						bool bButton = SDL_GameControllerGetButton(
 							controllerHandles[controllerIndex],
 							SDL_CONTROLLER_BUTTON_B);
-						bool XButton = SDL_GameControllerGetButton(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_BUTTON_X);
-						bool YButton = SDL_GameControllerGetButton(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_BUTTON_Y);
-
-						int16 StickX = SDL_GameControllerGetAxis(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_AXIS_LEFTX);
-						int16 StickY = SDL_GameControllerGetAxis(
-							controllerHandles[controllerIndex],
-							SDL_CONTROLLER_AXIS_LEFTY);
 
 						if (aButton)
 						{
