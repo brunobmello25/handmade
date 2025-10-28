@@ -50,6 +50,16 @@ struct SDLWindowDimension
 	int height;
 };
 
+struct PlatformAudioSettings
+{
+	int sampleRate;
+	int bytesPerSample;
+	int sampleIndex;
+	int toneHz;
+	int toneVolume;
+	int wavePeriod;
+};
+
 global_variable SDLBackBuffer globalBackbuffer;
 
 #define MAX_CONTROLLERS 4
@@ -275,6 +285,25 @@ internal void SDLCloseGameControllers()
 	}
 }
 
+void FillAudioDeviceBuffer(void *userData, uint8 *deviceBuffer, int length)
+{
+	PlatformAudioSettings *audioSettings = (PlatformAudioSettings *)userData;
+
+	int16 *sampleBuffer = (int16 *)deviceBuffer;
+	int samplesToWrite = length / audioSettings->bytesPerSample;
+	for (int sampleIndex = 0; sampleIndex < samplesToWrite; sampleIndex++)
+	{
+		int16 sampleValue = 0;
+		if ((audioSettings->sampleIndex / audioSettings->wavePeriod) % 2)
+		{
+			sampleValue = audioSettings->toneVolume;
+		}
+		*sampleBuffer++ = sampleValue;
+		*sampleBuffer++ = sampleValue;
+		audioSettings->sampleIndex++;
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
@@ -286,6 +315,28 @@ int main(int argc, char *argv[])
 		480, SDL_WINDOW_RESIZABLE);
 	if (window)
 	{
+		PlatformAudioSettings audioSettings = {};
+		audioSettings.bytesPerSample = 2 * sizeof(int16);
+		audioSettings.sampleRate = 48000;
+		audioSettings.sampleIndex = 0;
+		audioSettings.toneVolume = 3000;
+		audioSettings.toneHz = 262;
+		audioSettings.wavePeriod =
+			audioSettings.sampleRate / audioSettings.toneHz;
+
+		SDL_AudioSpec requestedSettings = {};
+		requestedSettings.freq = audioSettings.sampleRate;
+		requestedSettings.format = AUDIO_S16;
+		requestedSettings.channels = 2;
+		requestedSettings.samples = 4096;
+		requestedSettings.callback = &FillAudioDeviceBuffer;
+		requestedSettings.userdata = &audioSettings;
+
+		SDL_AudioSpec obtainedSettings = {};
+		SDL_AudioDeviceID deviceID = SDL_OpenAudioDevice(
+			NULL, 0, &requestedSettings, &obtainedSettings, 0);
+		SDL_PauseAudioDevice(deviceID, 0);
+
 		// Create a "Renderer" for our window.
 		SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 		if (renderer)
