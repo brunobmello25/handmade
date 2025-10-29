@@ -14,24 +14,6 @@ struct SDLBackbuffer
 global_variable SDLBackbuffer globalBackbuffer;
 global_variable bool globalRunning;
 
-bool processSDLEvents()
-{
-	SDL_Event event;
-
-	while (SDL_PollEvent(&event))
-	{
-		if (event.type == SDL_EVENT_QUIT)
-		{
-			return false;
-		}
-		if (event.type == SDL_EVENT_KEY_UP && event.key.key == SDLK_ESCAPE)
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
 void resizeSDLBackbuffer(SDLBackbuffer *backbuffer, SDL_Renderer *renderer,
@@ -51,6 +33,40 @@ void resizeSDLBackbuffer(SDLBackbuffer *backbuffer, SDL_Renderer *renderer,
 	backbuffer->texture =
 		SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
+}
+
+bool processSDLEvents(SDLBackbuffer *backbuffer)
+{
+	SDL_Event event;
+
+	while (SDL_PollEvent(&event))
+	{
+		if (event.type == SDL_EVENT_QUIT)
+		{
+			return false;
+		}
+		if (event.type == SDL_EVENT_KEY_UP && event.key.key == SDLK_ESCAPE)
+		{
+			return false;
+		}
+		if (event.type == SDL_EVENT_WINDOW_RESIZED)
+		{
+			SDL_Window *window = SDL_GetWindowFromEvent(&event);
+
+			if (!window)
+				return false; // TODO(bruno): proper error handling
+
+			SDL_Renderer *renderer = SDL_GetRenderer(window);
+			if (!renderer)
+				return false; // TODO(bruno): proper error handling
+
+			printf("Resizing backbuffer to %dx%d\n", event.window.data1,
+				   event.window.data2);
+			resizeSDLBackbuffer(backbuffer, renderer, event.window.data1,
+								event.window.data2);
+		}
+	}
+	return true;
 }
 
 int main(void)
@@ -76,7 +92,7 @@ int main(void)
 
 	while (globalRunning)
 	{
-		globalRunning = processSDLEvents();
+		globalRunning = processSDLEvents(&globalBackbuffer);
 	}
 
 	SDL_DestroyRenderer(renderer);
