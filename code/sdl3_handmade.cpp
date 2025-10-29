@@ -3,7 +3,7 @@
 
 #define global_variable static
 
-struct SDLBackbuffer
+struct PlatformBackbuffer
 {
 	int width;
 	int height;
@@ -11,13 +11,13 @@ struct SDLBackbuffer
 	SDL_Texture *texture;
 };
 
-global_variable SDLBackbuffer globalBackbuffer;
+global_variable PlatformBackbuffer globalBackbuffer;
 global_variable bool globalRunning;
 
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
-void resizeSDLBackbuffer(SDLBackbuffer *backbuffer, SDL_Renderer *renderer,
-						 int width, int height)
+void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
+							  SDL_Renderer *renderer, int width, int height)
 {
 	int bytesPerPixel = 4;
 
@@ -35,7 +35,7 @@ void resizeSDLBackbuffer(SDLBackbuffer *backbuffer, SDL_Renderer *renderer,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
 }
 
-bool processSDLEvents(SDLBackbuffer *backbuffer)
+bool platformProcessEvents(PlatformBackbuffer *backbuffer)
 {
 	SDL_Event event;
 
@@ -60,14 +60,14 @@ bool processSDLEvents(SDLBackbuffer *backbuffer)
 			if (!renderer)
 				return false; // TODO(bruno): proper error handling
 
-			printf("Resizing backbuffer to %dx%d\n", event.window.data1,
-				   event.window.data2);
-			resizeSDLBackbuffer(backbuffer, renderer, event.window.data1,
-								event.window.data2);
+			platformResizeBackbuffer(backbuffer, renderer, event.window.data1,
+									 event.window.data2);
 		}
 	}
 	return true;
 }
+
+void renderWeirdGradient() {}
 
 int main(void)
 {
@@ -86,13 +86,13 @@ int main(void)
 		return -1;
 
 	globalBackbuffer = {};
-	resizeSDLBackbuffer(&globalBackbuffer, renderer, initialWidth,
-						initialHeight);
+	platformResizeBackbuffer(&globalBackbuffer, renderer, initialWidth,
+							 initialHeight);
 	globalRunning = true;
 
 	while (globalRunning)
 	{
-		globalRunning = processSDLEvents(&globalBackbuffer);
+		globalRunning = platformProcessEvents(&globalBackbuffer);
 	}
 
 	SDL_DestroyRenderer(renderer);
