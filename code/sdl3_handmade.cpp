@@ -1,4 +1,5 @@
 #include <SDL3/SDL.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define global_variable static
@@ -7,6 +8,7 @@ struct PlatformBackbuffer
 {
 	int width;
 	int height;
+	int pitch;
 	void *memory;
 	SDL_Texture *texture;
 };
@@ -19,7 +21,7 @@ global_variable bool globalRunning;
 void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 							  SDL_Renderer *renderer, int width, int height)
 {
-	int bytesPerPixel = 4;
+	int bytesPerPixel = sizeof(int);
 
 	if (backbuffer->memory)
 		free(backbuffer->memory);
@@ -29,6 +31,7 @@ void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 
 	backbuffer->width = width;
 	backbuffer->height = height;
+	backbuffer->pitch = width * bytesPerPixel;
 	backbuffer->memory = malloc(width * height * bytesPerPixel);
 	backbuffer->texture =
 		SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
@@ -67,7 +70,32 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer)
 	return true;
 }
 
-void renderWeirdGradient() {}
+void platformUpdateWindow(PlatformBackbuffer *buffer, SDL_Window *window,
+						  SDL_Renderer *renderer)
+{
+	SDL_UpdateTexture(buffer->texture, NULL, buffer->memory, buffer->pitch);
+	SDL_RenderTexture(renderer, buffer->texture, 0, 0);
+	SDL_RenderPresent(renderer);
+}
+
+void renderWeirdGradient(PlatformBackbuffer *buffer, int blueOffset,
+						 int greenOffset)
+{
+	uint8_t *row = (uint8_t *)buffer->memory;
+	for (int y = 0; y < buffer->height; ++y)
+	{
+		uint32_t *pixel = (uint32_t *)row;
+		for (int x = 0; x < buffer->width; ++x)
+		{
+			uint8_t blue = (x + blueOffset);
+			uint8_t green = (y + greenOffset);
+
+			*pixel++ = (0xFF << 24) | (green << 8) | blue;
+		}
+
+		row += buffer->pitch;
+	}
+}
 
 int main(void)
 {
@@ -76,13 +104,11 @@ int main(void)
 
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
 		return -1;
+
 	SDL_Window *window = SDL_CreateWindow("Handmade Hero", initialWidth,
 										  initialHeight, SDL_WINDOW_RESIZABLE);
-	if (!window) // TODO(bruno): proper error handling
-		return -1;
-
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL);
-	if (!renderer) // TODO(bruno): proper error handling
+	if (!window || !renderer) // TODO(bruno): proper error handling
 		return -1;
 
 	globalBackbuffer = {};
@@ -90,14 +116,22 @@ int main(void)
 							 initialHeight);
 	globalRunning = true;
 
+	int blueOffset = 0, greenOffset = 0;
 	while (globalRunning)
 	{
 		globalRunning = platformProcessEvents(&globalBackbuffer);
+
+		renderWeirdGradient(&globalBackbuffer, blueOffset, greenOffset);
+		platformUpdateWindow(&globalBackbuffer, window, renderer);
+
+		blueOffset += 1;
 	}
 
-	SDL_DestroyRenderer(renderer);
-	SDL_DestroyWindow(window);
-	SDL_Quit();
+	// TODO(bruno): we are not freeing sdl renderer, sdl window and backbuffer
+	// here because honestly the OS will handle this for us after this return 0.
+	// but maybe we should revisit this?
+	// --
+	// nah, probably not
 
 	return 0;
 }
