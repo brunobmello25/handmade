@@ -41,7 +41,7 @@ case $PLATFORM in
         ;;
     "sdl3")
         echo "Compiling SDL3 version..."
-        bear -- c++ ../code/sdl3_handmade.cpp -o handmade `pkg-config sdl3 --cflags --libs` -Wall
+        bear -- c++ ../code/sdl3_handmade.cpp -o handmade -g `pkg-config sdl3 --cflags --libs` -Wall
         ;;
 esac
 
