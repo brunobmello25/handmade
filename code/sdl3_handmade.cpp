@@ -18,6 +18,7 @@ global_variable PlatformBackbuffer globalBackbuffer;
 global_variable bool globalRunning;
 
 global_variable SDL_Gamepad *GamepadHandles[MAX_CONTROLLERS];
+global_variable int xOffset = 0, yOffset = 0;
 
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
@@ -104,7 +105,16 @@ void platformLoadControllers()
 {
 
 	int gamepadCount;
-	int *ids = SDL_GetGamepads(&gamepadCount);
+	uint *ids = SDL_GetGamepads(&gamepadCount);
+
+	for (int i = 0; i < gamepadCount && i < MAX_CONTROLLERS; i++)
+	{
+		SDL_Gamepad *pad = SDL_OpenGamepad(ids[i]);
+		if (pad)
+		{
+			GamepadHandles[i] = pad;
+		}
+	}
 }
 
 int main(void)
@@ -112,8 +122,10 @@ int main(void)
 	int initialWidth = 1920 / 2;
 	int initialHeight = 1080 / 2;
 
-	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD))
 		return -1;
+
+	platformLoadControllers();
 
 	SDL_Window *window = SDL_CreateWindow("Handmade Hero", initialWidth,
 										  initialHeight, SDL_WINDOW_RESIZABLE);
@@ -121,20 +133,34 @@ int main(void)
 	if (!window || !renderer) // TODO(bruno): proper error handling
 		return -1;
 
+	globalRunning = true;
+
 	globalBackbuffer = {};
 	platformResizeBackbuffer(&globalBackbuffer, renderer, initialWidth,
 							 initialHeight);
-	globalRunning = true;
 
-	int blueOffset = 0, greenOffset = 0;
 	while (globalRunning)
 	{
 		globalRunning = platformProcessEvents(&globalBackbuffer);
 
-		renderWeirdGradient(&globalBackbuffer, blueOffset, greenOffset);
+		renderWeirdGradient(&globalBackbuffer, xOffset, yOffset);
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
 
-		blueOffset += 1;
+		for (int i = 0; i < MAX_CONTROLLERS; i++)
+		{
+			SDL_Gamepad *pad = GamepadHandles[i];
+			if (!pad)
+				continue;
+
+			bool aButton = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_SOUTH);
+
+			if (aButton)
+			{
+				yOffset += 2;
+			}
+		}
+
+		xOffset += 1;
 	}
 
 	// TODO(bruno): we are not freeing sdl renderer, sdl window and backbuffer
