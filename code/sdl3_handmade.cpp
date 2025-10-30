@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #define global_variable static
+#define MAX_CONTROLLERS 4
 
 struct PlatformBackbuffer
 {
@@ -15,6 +16,8 @@ struct PlatformBackbuffer
 
 global_variable PlatformBackbuffer globalBackbuffer;
 global_variable bool globalRunning;
+
+global_variable SDL_Gamepad *GamepadHandles[MAX_CONTROLLERS];
 
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
@@ -95,6 +98,13 @@ void renderWeirdGradient(PlatformBackbuffer *buffer, int blueOffset,
 
 		row += buffer->pitch;
 	}
+}
+
+void platformLoadControllers()
+{
+
+	int gamepadCount;
+	int *ids = SDL_GetGamepads(&gamepadCount);
 }
 
 int main(void)
