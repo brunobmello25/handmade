@@ -168,7 +168,7 @@ int main(void)
 			if (aButton)
 			{
 				yOffset += 2;
-				SDL_RumbleGamepad(pad, 60000, 60000, 30);
+				SDL_RumbleGamepad(pad, 20000, 20000, 30);
 			}
 			else
 			{
