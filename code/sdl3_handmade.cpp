@@ -52,9 +52,20 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer)
 		{
 			return false;
 		}
-		if (event.type == SDL_EVENT_KEY_UP && event.key.key == SDLK_ESCAPE)
+		if (event.type == SDL_EVENT_KEY_UP || event.type == SDL_EVENT_KEY_DOWN)
 		{
-			return false;
+			// TODO(bruno): handle key wasdown and isdown
+			if (event.key.key == SDLK_ESCAPE)
+				return false;
+
+			if (event.key.key == SDLK_W)
+				printf("w\n");
+			if (event.key.key == SDLK_A)
+				printf("a\n");
+			if (event.key.key == SDLK_S)
+				printf("s\n");
+			if (event.key.key == SDLK_D)
+				printf("d\n");
 		}
 		if (event.type == SDL_EVENT_WINDOW_RESIZED)
 		{
