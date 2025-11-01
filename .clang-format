@@ -7,19 +7,11 @@ IndentWidth: 4
 TabWidth: 4
 UseTab: Always
 
-# Allman‐style braces
-BreakBeforeBraces: Allman
+# Attach-style braces (braces on same line)
+BreakBeforeBraces: Attach
 
 # indent "case" under "switch"
 IndentCaseLabels: true
-
-# more fine-grain brace wrapping
-BraceWrapping:
-  AfterFunction: true
-  AfterControlStatement: true
-  AfterCaseLabel: true
-  BeforeElse: true
-  BeforeCatch: true
 
 # do NOT collapse short blocks onto one line
 AllowShortBlocksOnASingleLine: false
