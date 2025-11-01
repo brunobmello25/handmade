@@ -258,8 +258,8 @@ void platformInitializeSound(PlatformAudioBuffer *audioBuffer)
 
 	// NOTE(bruno): allocating a second worth of audio buffer.
 	// This is probably enough
-	audioBuffer->size =
-		audioBuffer->settings.sampleRate * audioBuffer->settings.bytesPerSample;
+	audioBuffer->size = 2 * audioBuffer->settings.sampleRate *
+						audioBuffer->settings.bytesPerSample;
 	audioBuffer->buffer = (int8_t *)calloc(
 		sizeof(int8_t),
 		audioBuffer->size); // NOTE(bruno): using calloc to zero the buffer
