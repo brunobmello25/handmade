@@ -146,17 +146,18 @@ void platformLoadControllers() {
 
 void platformSampleIntoAudioBuffer(
 	PlatformAudioBuffer *audioBuffer,
-	int16_t (*getSample)(PlatformAudioSettings *)) {
-	int region1Size = audioBuffer->readCursor - audioBuffer->writeCursor;
-	int region2Size = 0;
-	if (audioBuffer->readCursor < audioBuffer->writeCursor) {
-		// Fill to the end of the buffer and loop back around and fill to the
-		// read cursor.
-		region1Size = audioBuffer->size - audioBuffer->writeCursor;
-		region2Size = audioBuffer->readCursor;
-	}
+	int16_t (*getSample)(PlatformAudioSettings *), int samplesToWrite) {
 
 	PlatformAudioSettings *settings = &audioBuffer->settings;
+	int bytesToWrite = samplesToWrite * settings->bytesPerSample;
+
+	int region1Size = bytesToWrite;
+	int region2Size = 0;
+	if (audioBuffer->writeCursor + bytesToWrite > audioBuffer->size) {
+		// Write wraps around the circular buffer
+		region1Size = audioBuffer->size - audioBuffer->writeCursor;
+		region2Size = bytesToWrite - region1Size;
+	}
 
 	int region1Samples = region1Size / settings->bytesPerSample;
 	int region2Samples = region2Size / settings->bytesPerSample;
@@ -226,17 +227,19 @@ void platformInitializeSound(PlatformAudioBuffer *audioBuffer) {
 	audioBuffer->settings = {};
 	audioBuffer->settings.sampleRate = 48000;
 	audioBuffer->settings.numChannels = 2;
+	audioBuffer->settings.sampleIndex = 0;
+	audioBuffer->settings.toneHz = 512;
+	audioBuffer->settings.toneVolume = 3000;
 	audioBuffer->settings.bytesPerSample =
 		audioBuffer->settings.numChannels * sizeof(int16_t);
-	audioBuffer->settings.toneVolume = 3000;
-	audioBuffer->settings.toneHz = 256;
 	audioBuffer->settings.wavePeriod =
 		audioBuffer->settings.sampleRate / audioBuffer->settings.toneHz;
 
 	// NOTE(bruno): allocating a second worth of audio buffer.
 	// This is probably enough
-	audioBuffer->size = 2 * audioBuffer->settings.sampleRate *
-						audioBuffer->settings.bytesPerSample;
+	// TODO(bruno): go back to two seconds here
+	audioBuffer->size =
+		audioBuffer->settings.sampleRate * audioBuffer->settings.bytesPerSample;
 	audioBuffer->buffer = (int8_t *)calloc(
 		sizeof(int8_t),
 		audioBuffer->size); // NOTE(bruno): using calloc to zero the buffer
@@ -305,7 +308,11 @@ int main(void) {
 		globalRunning = platformProcessEvents(&globalBackbuffer);
 
 		SDL_LockAudioStream(globalAudioBuffer.stream);
-		platformSampleIntoAudioBuffer(&globalAudioBuffer, &sampleSineWave);
+		// Sample enough audio for this frame. Assuming 60 FPS:
+		// sampleRate / 60 = samples per frame
+		int targetSamplesPerFrame = globalAudioBuffer.settings.sampleRate / 60;
+		platformSampleIntoAudioBuffer(&globalAudioBuffer, &sampleSineWave,
+									  targetSamplesPerFrame);
 		SDL_UnlockAudioStream(globalAudioBuffer.stream);
 
 		renderWeirdGradient(&globalBackbuffer, xOffset, yOffset);
@@ -324,6 +331,12 @@ int main(void) {
 			xOffset += stickX / 8192;
 			yOffset += stickY / 8192;
 			printf("stickX: %d stickY: %d\n", stickX, stickY);
+
+			globalAudioBuffer.settings.toneHz =
+				512 + (int)(256.0f * ((float)stickY / 30000.0f));
+			globalAudioBuffer.settings.wavePeriod =
+				globalAudioBuffer.settings.sampleRate /
+				globalAudioBuffer.settings.toneHz;
 
 			bool aButton = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_SOUTH);
 			if (aButton) {
