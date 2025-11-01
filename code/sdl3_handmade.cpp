@@ -196,6 +196,8 @@ void platformSampleIntoAudioBuffer(
 		settings->sampleIndex++;
 	}
 
+	// TODO(bruno): some asserts to guarantee that readcursor never catches up
+	// to writecursor
 	audioBuffer->writeCursor =
 		(audioBuffer->writeCursor + bytesWritten) % audioBuffer->size;
 }
