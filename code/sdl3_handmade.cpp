@@ -269,6 +269,14 @@ void platformInitializeSound(PlatformAudioBuffer *audioBuffer)
 		return;
 	}
 
+	// start write cursor 50ms worth of samples ahead of read cursor:
+	// 1000ms (1seg) / 20 = 50ms
+	// samplerate(48000) / 20 = 2400 samples
+	// 2400 samples * 4 bytes per sample (stereo 16bit) = 9600 bytes
+	audioBuffer->readCursor = 0;
+	audioBuffer->writeCursor = audioBuffer->settings.sampleRate / 20 *
+							   audioBuffer->settings.bytesPerSample;
+
 	SDL_AudioSpec specs = {};
 	specs.format = SDL_AUDIO_S16LE;
 	specs.channels = 2;
