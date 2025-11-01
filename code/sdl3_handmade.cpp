@@ -235,14 +235,12 @@ void platformInitializeSound(PlatformAudioBuffer *audioBuffer) {
 	audioBuffer->settings.wavePeriod =
 		audioBuffer->settings.sampleRate / audioBuffer->settings.toneHz;
 
-	// NOTE(bruno): allocating a second worth of audio buffer.
-	// This is probably enough
-	// TODO(bruno): go back to two seconds here
-	audioBuffer->size =
-		audioBuffer->settings.sampleRate * audioBuffer->settings.bytesPerSample;
-	audioBuffer->buffer = (int8_t *)calloc(
-		sizeof(int8_t),
-		audioBuffer->size); // NOTE(bruno): using calloc to zero the buffer
+	int secondsOfAudio = 2;
+	audioBuffer->size = secondsOfAudio * audioBuffer->settings.sampleRate *
+						audioBuffer->settings.bytesPerSample;
+
+	audioBuffer->buffer = (int8_t *)calloc(sizeof(int8_t), audioBuffer->size);
+
 	if (!audioBuffer->buffer) {
 		printf("error allocating audio buffer\n");
 		return;
@@ -267,9 +265,10 @@ void platformInitializeSound(PlatformAudioBuffer *audioBuffer) {
 	if (!audioBuffer->stream) {
 		const char *error = SDL_GetError();
 		printf("error opening sdl audio stream: %s\n", error);
-	} else {
-		SDL_ResumeAudioStreamDevice(audioBuffer->stream);
+		return;
 	}
+
+	SDL_ResumeAudioStreamDevice(audioBuffer->stream);
 }
 
 int16_t platformGetAxisWithDeadzone(SDL_Gamepad *pad, SDL_GamepadAxis axis) {
@@ -308,11 +307,7 @@ int main(void) {
 		globalRunning = platformProcessEvents(&globalBackbuffer);
 
 		SDL_LockAudioStream(globalAudioBuffer.stream);
-		// Sample enough audio for this frame. Assuming 60 FPS:
-		// sampleRate / 60 = samples per frame
-		int targetSamplesPerFrame = globalAudioBuffer.settings.sampleRate / 60;
-		platformSampleIntoAudioBuffer(&globalAudioBuffer, &sampleSineWave,
-									  targetSamplesPerFrame);
+		// TODO(bruno): should write something to the buffer here
 		SDL_UnlockAudioStream(globalAudioBuffer.stream);
 
 		renderWeirdGradient(&globalBackbuffer, xOffset, yOffset);
