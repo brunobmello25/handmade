@@ -1,4 +1,6 @@
 #include <SDL3/SDL.h>
+#include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -14,11 +16,39 @@ struct PlatformBackbuffer
 	SDL_Texture *texture;
 };
 
-global_variable PlatformBackbuffer globalBackbuffer;
+struct PlatformAudioSettings
+{
+	int sampleRate;
+	int bytesPerSample;
+	int numChannels;
+
+	int toneHz;
+	int toneVolume;
+	int wavePeriod;
+	int sampleIndex;
+};
+
+struct PlatformAudioBuffer
+{
+	int8_t *buffer;
+	int size;
+	int readCursor;
+	int writeCursor;
+	PlatformAudioSettings settings;
+	SDL_AudioStream *stream;
+};
+
 global_variable bool globalRunning;
+
+global_variable PlatformBackbuffer globalBackbuffer;
+
+global_variable PlatformAudioBuffer globalAudioBuffer;
 
 global_variable SDL_Gamepad *GamepadHandles[MAX_CONTROLLERS];
 global_variable int xOffset = 0, yOffset = 0;
+
+global_variable float PI = 3.14159265359;
+global_variable float TAU = 2 * PI;
 
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
@@ -128,12 +158,143 @@ void platformLoadControllers()
 	}
 }
 
+void platformSampleIntoAudioBuffer(
+	PlatformAudioBuffer *audioBuffer,
+	int16_t (*getSample)(PlatformAudioSettings *))
+{
+	int region1Size = audioBuffer->readCursor - audioBuffer->writeCursor;
+	int region2Size = 0;
+	if (audioBuffer->readCursor < audioBuffer->writeCursor)
+	{
+		// Fill to the end of the buffer and loop back around and fill to the
+		// read cursor.
+		region1Size = audioBuffer->size - audioBuffer->writeCursor;
+		region2Size = audioBuffer->readCursor;
+	}
+
+	PlatformAudioSettings *settings = &audioBuffer->settings;
+
+	int region1Samples = region1Size / settings->bytesPerSample;
+	int region2Samples = region2Size / settings->bytesPerSample;
+	int bytesWritten = region1Size + region2Size;
+
+	int16_t *buffer = (int16_t *)&audioBuffer->buffer[audioBuffer->writeCursor];
+	for (int i = 0; i < region1Samples; i++)
+	{
+		int16_t sampleValue = (*getSample)(settings);
+		*buffer++ = sampleValue;
+		*buffer++ = sampleValue;
+		settings->sampleIndex++;
+	}
+
+	buffer = (int16_t *)audioBuffer->buffer;
+	for (int i = 0; i < region2Samples; i++)
+	{
+		int16_t SampleValue = (*getSample)(settings);
+		*buffer++ = SampleValue;
+		*buffer++ = SampleValue;
+		settings->sampleIndex++;
+	}
+
+	audioBuffer->writeCursor =
+		(audioBuffer->writeCursor + bytesWritten) % audioBuffer->size;
+}
+
+int16_t sampleSquareWave(PlatformAudioSettings *audioSettings)
+{
+	int HalfSquareWaveCounter = audioSettings->wavePeriod / 2;
+	if ((audioSettings->sampleIndex / HalfSquareWaveCounter) % 2 == 0)
+	{
+		return audioSettings->toneVolume;
+	}
+
+	return -audioSettings->toneVolume;
+}
+
+int16_t sampleSineWave(PlatformAudioSettings *audioSettings)
+{
+	int HalfWaveCounter = audioSettings->wavePeriod / 2;
+	return audioSettings->toneVolume *
+		   sin(TAU * audioSettings->sampleIndex / HalfWaveCounter);
+}
+
+void platformAudioCallback(void *userdata, SDL_AudioStream *stream, int amount,
+						   int totalAmount)
+{
+	PlatformAudioBuffer *audioBuffer = (PlatformAudioBuffer *)userdata;
+
+	int region1size = amount;
+	int region2size = 0;
+	if (audioBuffer->readCursor + region1size > audioBuffer->size)
+	{
+		region1size = audioBuffer->size - audioBuffer->readCursor;
+		region2size = amount - region1size;
+	}
+
+	SDL_PutAudioStreamData(
+		stream, (void *)&audioBuffer->buffer[audioBuffer->readCursor],
+		region1size);
+	if (region2size > 0)
+	{
+		SDL_PutAudioStreamData(stream, audioBuffer->buffer, region2size);
+	}
+
+	audioBuffer->readCursor =
+		(audioBuffer->readCursor + amount) % audioBuffer->size;
+}
+
+void platformInitializeSound(PlatformAudioBuffer *audioBuffer)
+{
+
+	audioBuffer->settings = {};
+	audioBuffer->settings.sampleRate = 48000;
+	audioBuffer->settings.numChannels = 2;
+	audioBuffer->settings.bytesPerSample =
+		audioBuffer->settings.numChannels * sizeof(int16_t);
+	audioBuffer->settings.toneVolume = 3000;
+	audioBuffer->settings.toneHz = 262;
+	audioBuffer->settings.wavePeriod =
+		audioBuffer->settings.sampleRate / audioBuffer->settings.toneHz;
+
+	// NOTE(bruno): allocating a second worth of audio buffer.
+	// This is probably enough
+	audioBuffer->size =
+		audioBuffer->settings.sampleRate * audioBuffer->settings.bytesPerSample;
+	audioBuffer->buffer = (int8_t *)calloc(
+		sizeof(int8_t),
+		audioBuffer->size); // NOTE(bruno): using calloc to zero the buffer
+	if (!audioBuffer->buffer)
+	{
+		printf("error allocating audio buffer\n");
+		return;
+	}
+
+	SDL_AudioSpec specs = {};
+	specs.format = SDL_AUDIO_S16LE;
+	specs.channels = 2;
+	specs.freq = audioBuffer->settings.sampleRate;
+
+	audioBuffer->stream =
+		SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &specs,
+								  &platformAudioCallback, audioBuffer);
+	if (!audioBuffer->stream)
+	{
+		const char *error = SDL_GetError();
+		printf("error opening sdl audio stream: %s\n", error);
+	}
+	else
+	{
+		SDL_ResumeAudioStreamDevice(audioBuffer->stream);
+	}
+}
+
 int main(void)
 {
 	int initialWidth = 1920 / 2;
 	int initialHeight = 1080 / 2;
 
-	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD))
+	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD |
+				  SDL_INIT_AUDIO))
 		return -1;
 
 	platformLoadControllers();
@@ -144,6 +305,8 @@ int main(void)
 	if (!window || !renderer) // TODO(bruno): proper error handling
 		return -1;
 
+	platformInitializeSound(&globalAudioBuffer);
+
 	globalRunning = true;
 
 	globalBackbuffer = {};
@@ -153,6 +316,10 @@ int main(void)
 	while (globalRunning)
 	{
 		globalRunning = platformProcessEvents(&globalBackbuffer);
+
+		SDL_LockAudioStream(globalAudioBuffer.stream);
+		platformSampleIntoAudioBuffer(&globalAudioBuffer, &sampleSineWave);
+		SDL_UnlockAudioStream(globalAudioBuffer.stream);
 
 		renderWeirdGradient(&globalBackbuffer, xOffset, yOffset);
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
