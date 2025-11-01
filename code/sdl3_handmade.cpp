@@ -279,6 +279,37 @@ int16_t platformGetAxisWithDeadzone(SDL_Gamepad *pad, SDL_GamepadAxis axis) {
 	return axisValue;
 }
 
+void platformProcessControllers() {
+	for (int i = 0; i < MAX_CONTROLLERS; i++) {
+		SDL_Gamepad *pad = GamepadHandles[i];
+		if (!pad)
+			continue;
+
+		int16_t stickX =
+			platformGetAxisWithDeadzone(pad, SDL_GAMEPAD_AXIS_LEFTX);
+		int16_t stickY =
+			platformGetAxisWithDeadzone(pad, SDL_GAMEPAD_AXIS_LEFTY);
+
+		xOffset += stickX / 8192;
+		yOffset += stickY / 8192;
+		printf("stickX: %d stickY: %d\n", stickX, stickY);
+
+		globalAudioBuffer.settings.toneHz =
+			512 + (int)(256.0f * ((float)stickY / 30000.0f));
+		globalAudioBuffer.settings.wavePeriod =
+			globalAudioBuffer.settings.sampleRate /
+			globalAudioBuffer.settings.toneHz;
+
+		bool aButton = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_SOUTH);
+		if (aButton) {
+			yOffset += 2;
+			SDL_RumbleGamepad(pad, 20000, 20000, 30);
+		} else {
+			SDL_RumbleGamepad(pad, 0, 0, 0);
+		}
+	}
+}
+
 int main(void) {
 	int initialWidth = 1920 / 2;
 	int initialHeight = 1080 / 2;
@@ -310,37 +341,10 @@ int main(void) {
 		// TODO(bruno): should write something to the buffer here
 		SDL_UnlockAudioStream(globalAudioBuffer.stream);
 
+		platformProcessControllers();
+
 		renderWeirdGradient(&globalBackbuffer, xOffset, yOffset);
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
-
-		for (int i = 0; i < MAX_CONTROLLERS; i++) {
-			SDL_Gamepad *pad = GamepadHandles[i];
-			if (!pad)
-				continue;
-
-			int16_t stickX =
-				platformGetAxisWithDeadzone(pad, SDL_GAMEPAD_AXIS_LEFTX);
-			int16_t stickY =
-				platformGetAxisWithDeadzone(pad, SDL_GAMEPAD_AXIS_LEFTY);
-
-			xOffset += stickX / 8192;
-			yOffset += stickY / 8192;
-			printf("stickX: %d stickY: %d\n", stickX, stickY);
-
-			globalAudioBuffer.settings.toneHz =
-				512 + (int)(256.0f * ((float)stickY / 30000.0f));
-			globalAudioBuffer.settings.wavePeriod =
-				globalAudioBuffer.settings.sampleRate /
-				globalAudioBuffer.settings.toneHz;
-
-			bool aButton = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_SOUTH);
-			if (aButton) {
-				yOffset += 2;
-				SDL_RumbleGamepad(pad, 20000, 20000, 30);
-			} else {
-				SDL_RumbleGamepad(pad, 0, 0, 0);
-			}
-		}
 	}
 
 	// TODO(bruno): we are not freeing sdl renderer, sdl window and backbuffer
