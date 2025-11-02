@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <x86intrin.h>
 
 #define global_variable static
 #define MAX_CONTROLLERS 4
@@ -331,6 +332,10 @@ int main(void) {
 							 initialHeight);
 
 	while (globalRunning) {
+
+		int64_t frameStart = SDL_GetPerformanceCounter();
+		uint64_t startCyclesCount = _rdtsc();
+
 		globalRunning = platformProcessEvents(&globalBackbuffer);
 
 		SDL_LockAudioStream(globalAudioBuffer.stream);
@@ -355,6 +360,19 @@ int main(void) {
 
 		renderWeirdGradient(&globalBackbuffer, xOffset, yOffset);
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
+
+		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
+		int64_t frameEnd = SDL_GetPerformanceCounter();
+		int64_t frameDuration = frameEnd - frameStart;
+		real64 msPerFrame =
+			((real64)frameDuration * 1000) / (real64)perfFrequency;
+		real64 fps = (real64)perfFrequency / (real64)frameDuration;
+
+		u_int64_t endCyclesCount = _rdtsc();
+		u_int64_t cyclesElapsed = endCyclesCount - startCyclesCount;
+
+		printf("ms/frame: %.02f  fps: %.02f  MegaCycles/frame: %lu\n",
+			   msPerFrame, fps, cyclesElapsed / (1000 * 1000));
 	}
 
 	// TODO(bruno): we are not freeing sdl renderer, sdl window and backbuffer
