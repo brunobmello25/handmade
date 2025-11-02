@@ -1,8 +1,26 @@
+/*
+ * TODO(bruno): Finish this platform layer
+ * - save game locations
+ * - getting a handle to our own executable file
+ * - asset loading path
+ * - threading
+ * - raw input (support multiple keyboards)
+ * - sleep/timeBeginPeriod
+ * - clipcursor (multimonitor support)
+ * - fullscreen support
+ * - wm_setcursor (control cursor visibility)
+ * - querycancelautoplay
+ * - wm_activateapp
+ * - blit speed improvements
+ * - hardware acceleration (opengl/direct3d/vulkan)
+ * - getkeyboardlayout
+ * */
+
+#include "handmade.cpp"
+
 #include <SDL3/SDL.h>
 #include <math.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <x86intrin.h>
 
 #define global_variable static
@@ -34,7 +52,7 @@ struct PlatformAudioSettings {
 };
 
 struct PlatformAudioBuffer {
-	int8_t *buffer; // TODO(bruno): switch this to a void* maybe
+	void *buffer;
 	int size;
 	int readCursor;
 	int writeCursor;
@@ -52,7 +70,6 @@ global_variable SDL_Gamepad *GamepadHandles[MAX_CONTROLLERS] = {};
 global_variable int xOffset = 0, yOffset = 0;
 
 global_variable float PI = 3.14159265359f;
-global_variable float TAU = 2 * PI;
 
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
@@ -121,22 +138,6 @@ void platformUpdateWindow(PlatformBackbuffer *buffer, SDL_Window *window,
 	SDL_RenderPresent(renderer);
 }
 
-void renderWeirdGradient(PlatformBackbuffer *buffer, int blueOffset,
-						 int greenOffset) {
-	uint8_t *row = (uint8_t *)buffer->memory;
-	for (int y = 0; y < buffer->height; ++y) {
-		uint32_t *pixel = (uint32_t *)row;
-		for (int x = 0; x < buffer->width; ++x) {
-			uint8_t blue = (x + blueOffset);
-			uint8_t green = (y + greenOffset);
-
-			*pixel++ = (0xFF << 24) | (green << 8) | blue;
-		}
-
-		row += buffer->pitch;
-	}
-}
-
 void platformLoadControllers() {
 
 	int gamepadCount;
@@ -162,7 +163,7 @@ void platformAudioCallback(void *userdata, SDL_AudioStream *stream, int amount,
 	}
 
 	SDL_PutAudioStreamData(
-		stream, (void *)&audioBuffer->buffer[audioBuffer->readCursor],
+		stream, (uint8_t *)audioBuffer->buffer + audioBuffer->readCursor,
 		region1size);
 	if (region2size > 0) {
 		SDL_PutAudioStreamData(stream, audioBuffer->buffer, region2size);
@@ -192,7 +193,7 @@ void platformInitializeSound(PlatformAudioBuffer *audioBuffer) {
 	audioBuffer->size = secondsOfAudio * audioBuffer->settings.sampleRate *
 						audioBuffer->settings.bytesPerSample;
 
-	audioBuffer->buffer = (int8_t *)calloc(sizeof(int8_t), audioBuffer->size);
+	audioBuffer->buffer = calloc(sizeof(int8_t), audioBuffer->size);
 
 	if (!audioBuffer->buffer) {
 		printf("error allocating audio buffer\n");
@@ -358,7 +359,12 @@ int main(void) {
 
 		platformProcessControllers();
 
-		renderWeirdGradient(&globalBackbuffer, xOffset, yOffset);
+		GameBackbuffer gamebackbuffer = {};
+		gamebackbuffer.width = globalBackbuffer.width;
+		gamebackbuffer.height = globalBackbuffer.height;
+		gamebackbuffer.pitch = globalBackbuffer.pitch;
+		gamebackbuffer.memory = globalBackbuffer.memory;
+		gameUpdateAndRender(&gamebackbuffer, xOffset, yOffset);
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
 
 		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
