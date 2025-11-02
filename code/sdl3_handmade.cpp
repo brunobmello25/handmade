@@ -28,7 +28,7 @@ struct PlatformAudioSettings {
 };
 
 struct PlatformAudioBuffer {
-	int8_t *buffer;
+	int8_t *buffer; // TODO(bruno): switch this to a void* maybe
 	int size;
 	int readCursor;
 	int writeCursor;
@@ -144,62 +144,6 @@ void platformLoadControllers() {
 	}
 }
 
-void platformSampleIntoAudioBuffer(
-	PlatformAudioBuffer *audioBuffer,
-	int16_t (*getSample)(PlatformAudioSettings *), int samplesToWrite) {
-
-	PlatformAudioSettings *settings = &audioBuffer->settings;
-	int bytesToWrite = samplesToWrite * settings->bytesPerSample;
-
-	int region1Size = bytesToWrite;
-	int region2Size = 0;
-	if (audioBuffer->writeCursor + bytesToWrite > audioBuffer->size) {
-		// Write wraps around the circular buffer
-		region1Size = audioBuffer->size - audioBuffer->writeCursor;
-		region2Size = bytesToWrite - region1Size;
-	}
-
-	int region1Samples = region1Size / settings->bytesPerSample;
-	int region2Samples = region2Size / settings->bytesPerSample;
-	int bytesWritten = region1Size + region2Size;
-
-	int16_t *buffer = (int16_t *)&audioBuffer->buffer[audioBuffer->writeCursor];
-	for (int i = 0; i < region1Samples; i++) {
-		int16_t sampleValue = (*getSample)(settings);
-		*buffer++ = sampleValue;
-		*buffer++ = sampleValue;
-		settings->sampleIndex++;
-	}
-
-	buffer = (int16_t *)audioBuffer->buffer;
-	for (int i = 0; i < region2Samples; i++) {
-		int16_t SampleValue = (*getSample)(settings);
-		*buffer++ = SampleValue;
-		*buffer++ = SampleValue;
-		settings->sampleIndex++;
-	}
-
-	// TODO(bruno): handle what happens when readcursor catches up to
-	// writecursor
-	audioBuffer->writeCursor =
-		(audioBuffer->writeCursor + bytesWritten) % audioBuffer->size;
-}
-
-int16_t sampleSquareWave(PlatformAudioSettings *audioSettings) {
-	int HalfSquareWaveCounter = audioSettings->wavePeriod / 2;
-	if ((audioSettings->sampleIndex / HalfSquareWaveCounter) % 2 == 0) {
-		return audioSettings->toneVolume;
-	}
-
-	return -audioSettings->toneVolume;
-}
-
-int16_t sampleSineWave(PlatformAudioSettings *audioSettings) {
-	int HalfWaveCounter = audioSettings->wavePeriod / 2;
-	return audioSettings->toneVolume *
-		   sin(TAU * audioSettings->sampleIndex / HalfWaveCounter);
-}
-
 void platformAudioCallback(void *userdata, SDL_AudioStream *stream, int amount,
 						   int totalAmount) {
 	PlatformAudioBuffer *audioBuffer = (PlatformAudioBuffer *)userdata;
@@ -228,7 +172,7 @@ void platformInitializeSound(PlatformAudioBuffer *audioBuffer) {
 	audioBuffer->settings.sampleRate = 48000;
 	audioBuffer->settings.numChannels = 2;
 	audioBuffer->settings.sampleIndex = 0;
-	audioBuffer->settings.toneHz = 512;
+	audioBuffer->settings.toneHz = 256;
 	audioBuffer->settings.toneVolume = 3000;
 	audioBuffer->settings.bytesPerSample =
 		audioBuffer->settings.numChannels * sizeof(int16_t);
@@ -251,8 +195,9 @@ void platformInitializeSound(PlatformAudioBuffer *audioBuffer) {
 	// samplerate(48000) / 20 = 2400 samples
 	// 2400 samples * 4 bytes per sample (stereo 16bit) = 9600 bytes
 	audioBuffer->readCursor = 0;
-	audioBuffer->writeCursor = audioBuffer->settings.sampleRate / 20 *
-							   audioBuffer->settings.bytesPerSample;
+	audioBuffer->writeCursor = 0;
+	// audioBuffer->writeCursor = audioBuffer->settings.sampleRate / 20 *
+	// 						   audioBuffer->settings.bytesPerSample;
 
 	SDL_AudioSpec specs = {};
 	specs.format = SDL_AUDIO_S16LE;
@@ -295,7 +240,7 @@ void platformProcessControllers() {
 		printf("stickX: %d stickY: %d\n", stickX, stickY);
 
 		globalAudioBuffer.settings.toneHz =
-			512 + (int)(256.0f * ((float)stickY / 30000.0f));
+			256.0f + (int)(128.0f * ((float)stickY / 30000.0f));
 		globalAudioBuffer.settings.wavePeriod =
 			globalAudioBuffer.settings.sampleRate /
 			globalAudioBuffer.settings.toneHz;
@@ -307,6 +252,57 @@ void platformProcessControllers() {
 		} else {
 			SDL_RumbleGamepad(pad, 0, 0, 0);
 		}
+	}
+}
+
+void writeSquareWave(PlatformAudioBuffer *audioBuffer) {
+	SDL_LockAudioStream(audioBuffer->stream);
+
+	int byteToLock = audioBuffer->settings.sampleIndex *
+					 audioBuffer->settings.bytesPerSample % audioBuffer->size;
+	int bytesToWrite;
+	if (byteToLock == audioBuffer->readCursor) {
+		bytesToWrite = audioBuffer->size;
+	} else if (byteToLock > audioBuffer->readCursor) {
+		bytesToWrite = audioBuffer->size - byteToLock;
+		bytesToWrite += audioBuffer->readCursor;
+	} else {
+		bytesToWrite = audioBuffer->readCursor - byteToLock;
+	}
+
+	void *region1 = (u_int8_t *)audioBuffer->buffer + byteToLock;
+	int region1size = bytesToWrite;
+	if (region1size + byteToLock > audioBuffer->size)
+		region1size = audioBuffer->size - byteToLock;
+
+	void *region2 = audioBuffer->buffer;
+	int region2size = bytesToWrite - region1size;
+
+	SDL_UnlockAudioStream(audioBuffer->stream);
+
+	int region1SampleCount = region1size / audioBuffer->settings.bytesPerSample;
+	int16_t *sampleOut = (int16_t *)region1;
+
+	for (int i = 0; i < region1SampleCount; i++) {
+		int16_t SampleValue = ((audioBuffer->settings.sampleIndex++ /
+								(audioBuffer->settings.wavePeriod / 2)) %
+							   2)
+								  ? audioBuffer->settings.toneVolume
+								  : -audioBuffer->settings.toneVolume;
+		*sampleOut++ = SampleValue;
+		*sampleOut++ = SampleValue;
+	}
+
+	int region2SampleCount = region2size / audioBuffer->settings.bytesPerSample;
+	sampleOut = (int16_t *)region2;
+	for (int i = 0; i < region2SampleCount; ++i) {
+		int16_t SampleValue = ((audioBuffer->settings.sampleIndex++ /
+								(audioBuffer->settings.wavePeriod / 2)) %
+							   2)
+								  ? audioBuffer->settings.toneVolume
+								  : -audioBuffer->settings.toneVolume;
+		*sampleOut++ = SampleValue;
+		*sampleOut++ = SampleValue;
 	}
 }
 
@@ -337,9 +333,7 @@ int main(void) {
 	while (globalRunning) {
 		globalRunning = platformProcessEvents(&globalBackbuffer);
 
-		SDL_LockAudioStream(globalAudioBuffer.stream);
-		// TODO(bruno): should write something to the buffer here
-		SDL_UnlockAudioStream(globalAudioBuffer.stream);
+		writeSquareWave(&globalAudioBuffer);
 
 		platformProcessControllers();
 
