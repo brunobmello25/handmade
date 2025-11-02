@@ -5,10 +5,8 @@ set -e
 PLATFORM=${1:-sdl3}
 
 usage() {
-    echo "Usage: $0 [raylib|sdl]"
-    echo "  raylib: Build with raylib (default)"
-    echo "  sdl:    Build with SDL2"
-    echo "  linux:    Build with raw X11 (or wayland eventually)"
+    echo "Usage: $0 [sdl3]"
+    echo "  sdl3:    Build with SDL3"
     exit 1
 }
 
@@ -16,7 +14,7 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     usage
 fi
 
-if [[ "$PLATFORM" != "raylib" && "$PLATFORM" != "sdl" && "$PLATFORM" != "linux" && "$PLATFORM" != "sdl3" ]]; then
+if [[ "$PLATFORM" != "sdl3" ]]; then
     echo "Error: Invalid platform '$PLATFORM'"
     usage
 fi
@@ -27,18 +25,6 @@ mkdir -p ./target
 pushd ./target/
 
 case $PLATFORM in
-    "raylib")
-        echo "Compiling raylib version..."
-        bear -- c++ ../code/raylib_linux_handmade.cpp -o handmade -g -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
-        ;;
-    "sdl")
-        echo "Compiling SDL version..."
-        bear -- c++ -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 ../code/sdl_handmade.cpp -o handmade -g `sdl2-config --cflags --libs` -Wall -Wno-write-strings -fno-rtti -fno-exceptions
-        ;;
-    "linux")
-        echo "Compiling raw X11 version..."
-        bear -- c++ ../code/linux_handmade.cpp -o handmade -lX11
-        ;;
     "sdl3")
         echo "Compiling SDL3 version..."
         bear -- c++ ../code/sdl3_handmade.cpp -o handmade -g `pkg-config sdl3 --cflags --libs` -Wall
