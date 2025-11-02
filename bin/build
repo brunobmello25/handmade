@@ -47,10 +47,4 @@ esac
 
 popd
 
-# Extend compile_commands.json for non-self-contained files
-if [[ -f target/compile_commands.json ]]; then
-    ./extend_compile_commands.py
-    ln -sf target/compile_commands.json .
-fi
-
 echo "Build completed successfully!"
