@@ -17,18 +17,15 @@
  * */
 
 #include "handmade.cpp"
+#include "handmade.h"
 
 #include <SDL3/SDL.h>
-#include <math.h>
+#include <cstdint>
 #include <stdio.h>
 #include <x86intrin.h>
 
-#define global_variable static
 #define MAX_CONTROLLERS 4
 #define STICK_DEADZONE 8000
-
-typedef float real32;
-typedef double real64;
 
 struct PlatformBackbuffer {
 	int width;
@@ -68,8 +65,6 @@ global_variable PlatformAudioBuffer globalAudioBuffer;
 
 global_variable SDL_Gamepad *GamepadHandles[MAX_CONTROLLERS] = {};
 global_variable int xOffset = 0, yOffset = 0;
-
-global_variable float PI = 3.14159265359f;
 
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
@@ -264,7 +259,8 @@ void platformProcessControllers() {
 	}
 }
 
-void platformFillSoundBuffer(PlatformAudioBuffer *audioBuffer, int byteToLock,
+void platformFillSoundBuffer(PlatformAudioBuffer *audioBuffer,
+							 GameSoundBuffer *gameSoundBuffer, int byteToLock,
 							 int bytesToWrite) {
 	void *region1 = (u_int8_t *)audioBuffer->buffer + byteToLock;
 	int region1size = bytesToWrite;
@@ -276,33 +272,42 @@ void platformFillSoundBuffer(PlatformAudioBuffer *audioBuffer, int byteToLock,
 
 	int region1SampleCount = region1size / audioBuffer->settings.bytesPerSample;
 	int16_t *sampleOut = (int16_t *)region1;
+	int16_t *sampleIn = gameSoundBuffer->samples;
 
 	for (int i = 0; i < region1SampleCount; i++) {
-		real32 sineValue = sinf(audioBuffer->settings.tSine);
-		int16_t sampleValue =
-			(int16_t)(sineValue * audioBuffer->settings.toneVolume);
-		*sampleOut++ = sampleValue;
-		*sampleOut++ = sampleValue;
-
-		audioBuffer->settings.tSine +=
-			2.0f * PI * 1.0f / (real32)audioBuffer->settings.wavePeriod;
-
+		*sampleOut++ = *sampleIn++;
+		*sampleOut++ = *sampleIn++;
 		audioBuffer->settings.sampleIndex++;
 	}
 
 	int region2SampleCount = region2size / audioBuffer->settings.bytesPerSample;
 	sampleOut = (int16_t *)region2;
 	for (int i = 0; i < region2SampleCount; ++i) {
-		real32 sineValue = sinf(audioBuffer->settings.tSine);
-		int16_t sampleValue =
-			(int16_t)(sineValue * audioBuffer->settings.toneVolume);
-		*sampleOut++ = sampleValue;
-		*sampleOut++ = sampleValue;
-
-		audioBuffer->settings.tSine +=
-			2.0f * PI * 1.0f / (real32)audioBuffer->settings.wavePeriod;
+		*sampleOut++ = *sampleIn++;
+		*sampleOut++ = *sampleIn++;
 		audioBuffer->settings.sampleIndex++;
 	}
+}
+
+void platformCalculateSoundByteToLockAndWrite(int *byteToLockResult,
+											  int *bytesToWriteResult) {
+	int byteToLock = (globalAudioBuffer.settings.sampleIndex *
+					  globalAudioBuffer.settings.bytesPerSample) %
+					 globalAudioBuffer.size;
+	int targetCursor = ((globalAudioBuffer.readCursor +
+						 (globalAudioBuffer.settings.latencySampleCount *
+						  globalAudioBuffer.settings.bytesPerSample)) %
+						globalAudioBuffer.size);
+	int bytesToWrite;
+	if (byteToLock > targetCursor) {
+		bytesToWrite = (globalAudioBuffer.size - byteToLock);
+		bytesToWrite += targetCursor;
+	} else {
+		bytesToWrite = targetCursor - byteToLock;
+	}
+
+	*byteToLockResult = byteToLock;
+	*bytesToWriteResult = bytesToWrite;
 }
 
 int main(void) {
@@ -322,9 +327,6 @@ int main(void) {
 		return -1;
 
 	platformInitializeSound(&globalAudioBuffer);
-	platformFillSoundBuffer(&globalAudioBuffer, 0,
-							globalAudioBuffer.settings.latencySampleCount *
-								globalAudioBuffer.settings.bytesPerSample);
 
 	globalRunning = true;
 
@@ -339,24 +341,6 @@ int main(void) {
 
 		globalRunning = platformProcessEvents(&globalBackbuffer);
 
-		SDL_LockAudioStream(globalAudioBuffer.stream);
-		int byteToLock = (globalAudioBuffer.settings.sampleIndex *
-						  globalAudioBuffer.settings.bytesPerSample) %
-						 globalAudioBuffer.size;
-		int targetCursor = ((globalAudioBuffer.readCursor +
-							 (globalAudioBuffer.settings.latencySampleCount *
-							  globalAudioBuffer.settings.bytesPerSample)) %
-							globalAudioBuffer.size);
-		int bytesToWrite;
-		if (byteToLock > targetCursor) {
-			bytesToWrite = (globalAudioBuffer.size - byteToLock);
-			bytesToWrite += targetCursor;
-		} else {
-			bytesToWrite = targetCursor - byteToLock;
-		}
-		platformFillSoundBuffer(&globalAudioBuffer, byteToLock, bytesToWrite);
-		SDL_UnlockAudioStream(globalAudioBuffer.stream);
-
 		platformProcessControllers();
 
 		GameBackbuffer gamebackbuffer = {};
@@ -364,8 +348,25 @@ int main(void) {
 		gamebackbuffer.height = globalBackbuffer.height;
 		gamebackbuffer.pitch = globalBackbuffer.pitch;
 		gamebackbuffer.memory = globalBackbuffer.memory;
-		gameUpdateAndRender(&gamebackbuffer, xOffset, yOffset);
+
+		GameSoundBuffer gameSoundBuffer = {};
+		int16_t samples[(48000 / 30) * 2]; // TODO(bruno): make this dynamic
+		gameSoundBuffer.sampleCount =
+			globalAudioBuffer.settings.sampleRate / 30;
+		gameSoundBuffer.sampleRate = globalAudioBuffer.settings.sampleRate;
+		gameSoundBuffer.samples = samples;
+
+		gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, xOffset,
+							yOffset);
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
+
+		SDL_LockAudioStream(globalAudioBuffer.stream);
+		int byteToLock;
+		int bytesToWrite;
+		platformCalculateSoundByteToLockAndWrite(&byteToLock, &bytesToWrite);
+		platformFillSoundBuffer(&globalAudioBuffer, &gameSoundBuffer,
+								byteToLock, bytesToWrite);
+		SDL_UnlockAudioStream(globalAudioBuffer.stream);
 
 		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
 		int64_t frameEnd = SDL_GetPerformanceCounter();

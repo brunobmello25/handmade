@@ -1,7 +1,12 @@
 #ifndef HANDMADE_H
-#define HANDMADE_H
 
 #include <stdint.h>
+
+#define global_variable static
+#define local_persist static
+
+typedef float real32;
+typedef double real64;
 
 struct GameBackbuffer {
 	int width;
@@ -10,7 +15,20 @@ struct GameBackbuffer {
 	void *memory;
 };
 
-// receives: timing, input, bitmap to output, sound to output
-void gameUpdateAndRender(GameBackbuffer *buffer, int xOffset, int yOffset);
+struct GameSoundBuffer {
+	int16_t *samples;
+	int sampleRate;
+	int sampleCount;
+};
 
+global_variable float PI = 3.14159265359f;
+
+// receives: timing, input, bitmap to output, sound to output
+void gameUpdateAndRender(GameBackbuffer *backbuffer,
+						 GameSoundBuffer *soundBuffer, int xOffset,
+						 int yOffset);
+
+void gameOutputSound(GameSoundBuffer *soundBuffer);
+
+#define HANDMADE_H
 #endif // HANDMADE_H
