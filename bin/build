@@ -5,8 +5,9 @@ set -e
 PLATFORM=${1:-sdl3}
 
 usage() {
-    echo "Usage: $0 [sdl3]"
-    echo "  sdl3:    Build with SDL3"
+    echo "Usage: $0 [sdl3|sdl3-local]"
+    echo "  sdl3:        Build with SDL3 (system/pkg-config)"
+    echo "  sdl3-local:  Build with local SDL3 from external/"
     exit 1
 }
 
@@ -14,7 +15,7 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     usage
 fi
 
-if [[ "$PLATFORM" != "sdl3" ]]; then
+if [[ "$PLATFORM" != "sdl3" && "$PLATFORM" != "sdl3-local" ]]; then
     echo "Error: Invalid platform '$PLATFORM'"
     usage
 fi
@@ -26,8 +27,20 @@ pushd ./target/
 
 case $PLATFORM in
     "sdl3")
-        echo "Compiling SDL3 version..."
+        echo "Compiling SDL3 version (system)..."
         bear -- c++ ../code/sdl3_handmade.cpp -o handmade -g `pkg-config sdl3 --cflags --libs` -Wall
+        ;;
+    "sdl3-local")
+        echo "Compiling SDL3 version (local)..."
+        SDL3_LOCAL="$(cd ../external/SDL/install && pwd)"
+        if [ ! -d "$SDL3_LOCAL" ]; then
+            echo "Error: Local SDL3 not found at $SDL3_LOCAL"
+            echo "Run './bin/setup-sdl3' to build SDL3 locally"
+            exit 1
+        fi
+        SDL3_CFLAGS="-I$SDL3_LOCAL/include"
+        SDL3_LIBS="-L$SDL3_LOCAL/lib -lSDL3 -Wl,-rpath,$SDL3_LOCAL/lib"
+        bear -- c++ ../code/sdl3_handmade.cpp -o handmade -g $SDL3_CFLAGS $SDL3_LIBS -Wall
         ;;
 esac
 

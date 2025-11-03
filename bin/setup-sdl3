@@ -1,0 +1,38 @@
+#!/bin/bash
+
+set -e
+
+SDL3_DIR="./external/SDL"
+BUILD_DIR="$SDL3_DIR/build"
+
+echo "Setting up SDL3..."
+
+# Clone SDL3 if not already present
+if [ ! -d "$SDL3_DIR" ]; then
+    echo "Cloning SDL3 repository..."
+    git clone https://github.com/libsdl-org/SDL.git "$SDL3_DIR"
+    cd "$SDL3_DIR"
+    git checkout main  # or a specific tag like 'release-3.x.x'
+    cd ../..
+else
+    echo "SDL3 directory already exists, skipping clone."
+fi
+
+# Build SDL3
+echo "Building SDL3..."
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$(pwd)/../install" \
+    -DSDL_SHARED=ON \
+    -DSDL_STATIC=OFF
+
+cmake --build . --config Release -j$(nproc)
+cmake --install .
+
+cd ../../..
+
+echo "SDL3 setup completed successfully!"
+echo "SDL3 installed to: $SDL3_DIR/install"
