@@ -21,12 +21,9 @@ struct GameSoundBuffer {
 	int sampleCount;
 };
 
-global_variable float PI = 3.14159265359f;
-
 // receives: timing, input, bitmap to output, sound to output
 void gameUpdateAndRender(GameBackbuffer *backbuffer,
-						 GameSoundBuffer *soundBuffer, int xOffset,
-						 int yOffset);
+						 GameSoundBuffer *soundBuffer);
 
 void gameOutputSound(GameSoundBuffer *soundBuffer);
 

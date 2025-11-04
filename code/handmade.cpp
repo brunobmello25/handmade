@@ -1,6 +1,8 @@
 #include "handmade.h"
 #include <math.h>
 
+global_variable float PI = 3.14159265359f;
+
 void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
 						 int greenOffset) {
 	uint8_t *row = (uint8_t *)buffer->memory;
@@ -41,11 +43,19 @@ void gameOutputSound(GameSoundBuffer *soundBuffer) {
 }
 
 void gameUpdateAndRender(GameBackbuffer *backbuffer,
-						 GameSoundBuffer *soundBuffer, int xOffset,
-						 int yOffset) {
+						 GameSoundBuffer *soundBuffer) {
+	// TODO(bruno): Remove these local persists
+	local_persist int blueOffset = 0;
+	local_persist int greenOffset = 0;
 
-	// TODO(bruno): Allow sample offsets here for more robust platform options
+	// input.aButtonEndedDown
+	// input.aButtonHalfTransitionCount
+	if (input.aButtonEndedDown) {
+	}
+
+	// TODO(bruno): Allow sample offsets here for more robust
+	// platform options
 	gameOutputSound(soundBuffer);
 
-	renderWeirdGradient(backbuffer, xOffset, yOffset);
+	renderWeirdGradient(backbuffer, blueOffset, greenOffset);
 }

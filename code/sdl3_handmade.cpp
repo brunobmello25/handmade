@@ -294,20 +294,18 @@ int main(void) {
 		// Only generate audio if we're actually going to use it
 		if (platformShouldQueueAudioSamples()) {
 			GameSoundBuffer gameSoundBuffer = {};
-			int16_t samples[48000 * 2]; // 1 second max buffer
+			int16_t samples[48000 * 2]; // TODO(bruno): 1 second max buffer.
+										// make this dynamic later
 			gameSoundBuffer.sampleCount =
 				platformGetSamplesToGenerate(frameStart, lastFrameStart);
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
 
-			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, xOffset,
-								yOffset);
+			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer);
 			platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
 		} else {
-			// No audio needed this frame, just render
 			GameSoundBuffer gameSoundBuffer = {};
-			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, xOffset,
-								yOffset);
+			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer);
 		}
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
 
