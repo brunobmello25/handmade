@@ -18,6 +18,9 @@ void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
 }
 
 void gameOutputSound(GameSoundBuffer *soundBuffer) {
+	if (soundBuffer->sampleCount == 0)
+		return;
+
 	local_persist real32 tsine =
 		0.0f; // TODO(bruno): remove this local persist variable
 
