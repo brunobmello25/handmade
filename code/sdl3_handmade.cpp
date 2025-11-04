@@ -19,16 +19,11 @@
 #include "handmade.cpp"
 
 #include <SDL3/SDL.h>
-#include <math.h>
 #include <stdio.h>
 #include <x86intrin.h>
 
-#define global_variable static
 #define MAX_CONTROLLERS 4
 #define STICK_DEADZONE 8000
-
-typedef float real32;
-typedef double real64;
 
 struct PlatformBackbuffer {
 	int width;
@@ -38,38 +33,21 @@ struct PlatformBackbuffer {
 	SDL_Texture *texture;
 };
 
-struct PlatformAudioSettings {
-	int sampleRate;
-	int bytesPerSample;
-	int numChannels;
-
-	int toneHz;
-	int toneVolume;
-	int wavePeriod;
-	int sampleIndex;
-	int latencySampleCount;
-	float tSine;
-};
-
-struct PlatformAudioBuffer {
-	void *buffer;
-	int size;
-	int readCursor;
-	int writeCursor;
-	PlatformAudioSettings settings;
+struct PlatformAudioOutput {
+	SDL_AudioDeviceID device;
 	SDL_AudioStream *stream;
+	int sampleRate;
+	int numChannels;
 };
 
 global_variable bool globalRunning;
 
 global_variable PlatformBackbuffer globalBackbuffer;
 
-global_variable PlatformAudioBuffer globalAudioBuffer;
+global_variable PlatformAudioOutput globalAudioOutput;
 
 global_variable SDL_Gamepad *GamepadHandles[MAX_CONTROLLERS] = {};
 global_variable int xOffset = 0, yOffset = 0;
-
-global_variable float PI = 3.14159265359f;
 
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
@@ -151,79 +129,52 @@ void platformLoadControllers() {
 	}
 }
 
-void platformAudioCallback(void *userdata, SDL_AudioStream *stream, int amount,
-						   int totalAmount) {
-	PlatformAudioBuffer *audioBuffer = (PlatformAudioBuffer *)userdata;
+void platformInitializeSound(PlatformAudioOutput *audioOutput) {
+	audioOutput->sampleRate = 48000;
+	audioOutput->numChannels = 2;
 
-	int region1size = amount;
-	int region2size = 0;
-	if (audioBuffer->readCursor + region1size > audioBuffer->size) {
-		region1size = audioBuffer->size - audioBuffer->readCursor;
-		region2size = amount - region1size;
-	}
+	// Set low-latency audio buffer size hint before opening device
+	// Lower values = lower latency but more CPU usage
+	// At 48000 Hz: 512 samples = ~10.7ms latency, 1024 = ~21.3ms
+	SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "512");
 
-	SDL_PutAudioStreamData(
-		stream, (uint8_t *)audioBuffer->buffer + audioBuffer->readCursor,
-		region1size);
-	if (region2size > 0) {
-		SDL_PutAudioStreamData(stream, audioBuffer->buffer, region2size);
-	}
+	// Open the audio device
+	SDL_AudioSpec spec = {};
+	spec.format = SDL_AUDIO_S16;
+	spec.channels = audioOutput->numChannels;
+	spec.freq = audioOutput->sampleRate;
 
-	audioBuffer->readCursor =
-		(audioBuffer->readCursor + amount) % audioBuffer->size;
-}
-
-void platformInitializeSound(PlatformAudioBuffer *audioBuffer) {
-
-	audioBuffer->settings = {};
-	audioBuffer->settings.sampleRate = 48000;
-	audioBuffer->settings.numChannels = 2;
-	audioBuffer->settings.sampleIndex = 0;
-	audioBuffer->settings.toneHz = 256;
-	audioBuffer->settings.toneVolume = 3000;
-	audioBuffer->settings.tSine = 0.0f;
-	audioBuffer->settings.latencySampleCount =
-		audioBuffer->settings.sampleRate / 15;
-	audioBuffer->settings.bytesPerSample =
-		audioBuffer->settings.numChannels * sizeof(int16_t);
-	audioBuffer->settings.wavePeriod =
-		audioBuffer->settings.sampleRate / audioBuffer->settings.toneHz;
-
-	int secondsOfAudio = 1;
-	audioBuffer->size = secondsOfAudio * audioBuffer->settings.sampleRate *
-						audioBuffer->settings.bytesPerSample;
-
-	audioBuffer->buffer = calloc(sizeof(int8_t), audioBuffer->size);
-
-	if (!audioBuffer->buffer) {
-		printf("error allocating audio buffer\n");
+	audioOutput->device =
+		SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec);
+	if (!audioOutput->device) {
+		printf("Failed to open audio device: %s\n", SDL_GetError());
 		return;
 	}
 
-	// start write cursor 50ms worth of samples ahead of read cursor:
-	// 1000ms (1seg) / 20 = 50ms
-	// samplerate(48000) / 20 = 2400 samples
-	// 2400 samples * 4 bytes per sample (stereo 16bit) = 9600 bytes
-	audioBuffer->readCursor = 0;
-	audioBuffer->writeCursor = 0;
-	// audioBuffer->writeCursor = audioBuffer->settings.sampleRate / 20 *
-	// 						   audioBuffer->settings.bytesPerSample;
+	// Create an audio stream (same format for input and output - no conversion
+	// needed)
+	SDL_AudioSpec streamSpec = {};
+	streamSpec.format = SDL_AUDIO_S16;
+	streamSpec.channels = audioOutput->numChannels;
+	streamSpec.freq = audioOutput->sampleRate;
 
-	SDL_AudioSpec specs = {};
-	specs.format = SDL_AUDIO_S16LE;
-	specs.channels = 2;
-	specs.freq = audioBuffer->settings.sampleRate;
-
-	audioBuffer->stream =
-		SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &specs,
-								  &platformAudioCallback, audioBuffer);
-	if (!audioBuffer->stream) {
-		const char *error = SDL_GetError();
-		printf("error opening sdl audio stream: %s\n", error);
+	audioOutput->stream = SDL_CreateAudioStream(&streamSpec, &streamSpec);
+	if (!audioOutput->stream) {
+		printf("Failed to create audio stream: %s\n", SDL_GetError());
+		SDL_CloseAudioDevice(audioOutput->device);
 		return;
 	}
 
-	SDL_ResumeAudioStreamDevice(audioBuffer->stream);
+	// Bind the stream to the device
+	if (!SDL_BindAudioStream(audioOutput->device, audioOutput->stream)) {
+		printf("Failed to bind audio stream: %s\n", SDL_GetError());
+		SDL_DestroyAudioStream(audioOutput->stream);
+		SDL_CloseAudioDevice(audioOutput->device);
+		return;
+	}
+
+	// Resume the device (it starts paused)
+	SDL_ResumeAudioDevice(audioOutput->device);
 }
 
 int16_t platformGetAxisWithDeadzone(SDL_Gamepad *pad, SDL_GamepadAxis axis) {
@@ -248,12 +199,6 @@ void platformProcessControllers() {
 		xOffset += stickX / 8192;
 		yOffset += stickY / 8192;
 
-		globalAudioBuffer.settings.toneHz =
-			256.0f + (int)(128.0f * ((float)stickY / 30000.0f));
-		globalAudioBuffer.settings.wavePeriod =
-			globalAudioBuffer.settings.sampleRate /
-			globalAudioBuffer.settings.toneHz;
-
 		bool aButton = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_SOUTH);
 		if (aButton) {
 			yOffset += 2;
@@ -264,45 +209,45 @@ void platformProcessControllers() {
 	}
 }
 
-void platformFillSoundBuffer(PlatformAudioBuffer *audioBuffer, int byteToLock,
-							 int bytesToWrite) {
-	void *region1 = (u_int8_t *)audioBuffer->buffer + byteToLock;
-	int region1size = bytesToWrite;
-	if (region1size + byteToLock > audioBuffer->size)
-		region1size = audioBuffer->size - byteToLock;
+int platformGetSamplesToGenerate(int64_t frameStart, int64_t lastFrameStart) {
+	// Always generate audio based on elapsed time
+	u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
+	real64 secondsElapsed =
+		(real64)(frameStart - lastFrameStart) / (real64)perfFrequency;
 
-	void *region2 = audioBuffer->buffer;
-	int region2size = bytesToWrite - region1size;
+	int samplesToGenerate =
+		(int)(secondsElapsed * globalAudioOutput.sampleRate) + 1;
 
-	int region1SampleCount = region1size / audioBuffer->settings.bytesPerSample;
-	int16_t *sampleOut = (int16_t *)region1;
-
-	for (int i = 0; i < region1SampleCount; i++) {
-		real32 sineValue = sinf(audioBuffer->settings.tSine);
-		int16_t sampleValue =
-			(int16_t)(sineValue * audioBuffer->settings.toneVolume);
-		*sampleOut++ = sampleValue;
-		*sampleOut++ = sampleValue;
-
-		audioBuffer->settings.tSine +=
-			2.0f * PI * 1.0f / (real32)audioBuffer->settings.wavePeriod;
-
-		audioBuffer->settings.sampleIndex++;
+	// Clamp to max one frame at 15fps to handle debugger pauses
+	int maxSamplesPerFrame = globalAudioOutput.sampleRate / 15;
+	if (samplesToGenerate > maxSamplesPerFrame) {
+		samplesToGenerate = maxSamplesPerFrame;
 	}
 
-	int region2SampleCount = region2size / audioBuffer->settings.bytesPerSample;
-	sampleOut = (int16_t *)region2;
-	for (int i = 0; i < region2SampleCount; ++i) {
-		real32 sineValue = sinf(audioBuffer->settings.tSine);
-		int16_t sampleValue =
-			(int16_t)(sineValue * audioBuffer->settings.toneVolume);
-		*sampleOut++ = sampleValue;
-		*sampleOut++ = sampleValue;
+	return samplesToGenerate;
+}
 
-		audioBuffer->settings.tSine +=
-			2.0f * PI * 1.0f / (real32)audioBuffer->settings.wavePeriod;
-		audioBuffer->settings.sampleIndex++;
-	}
+bool platformShouldQueueAudioSamples() {
+
+	// Only push to audio stream if queue is below target (prevent
+	// accumulation)
+	int queued = SDL_GetAudioStreamQueued(globalAudioOutput.stream);
+	int queuedSamples =
+		queued / (globalAudioOutput.numChannels * sizeof(int16_t));
+	// Target: keep about 2-3 frames worth queued (~66ms at 30fps = safe
+	// buffer)
+	int targetQueuedSamples = (globalAudioOutput.sampleRate / 30) * 2;
+
+	return queuedSamples < targetQueuedSamples;
+}
+
+void platformOutputSound(PlatformAudioOutput *audioOutput,
+						 GameSoundBuffer *gameSoundBuffer) {
+	// Push audio data to the stream
+	int bytesPerSample = audioOutput->numChannels * sizeof(int16_t);
+	int bytesToWrite = gameSoundBuffer->sampleCount * bytesPerSample;
+	SDL_PutAudioStreamData(audioOutput->stream, gameSoundBuffer->samples,
+						   bytesToWrite);
 }
 
 int main(void) {
@@ -321,16 +266,15 @@ int main(void) {
 	if (!window || !renderer) // TODO(bruno): proper error handling
 		return -1;
 
-	platformInitializeSound(&globalAudioBuffer);
-	platformFillSoundBuffer(&globalAudioBuffer, 0,
-							globalAudioBuffer.settings.latencySampleCount *
-								globalAudioBuffer.settings.bytesPerSample);
+	platformInitializeSound(&globalAudioOutput);
 
 	globalRunning = true;
 
 	globalBackbuffer = {};
 	platformResizeBackbuffer(&globalBackbuffer, renderer, initialWidth,
 							 initialHeight);
+
+	int64_t lastFrameStart = SDL_GetPerformanceCounter();
 
 	while (globalRunning) {
 
@@ -339,24 +283,6 @@ int main(void) {
 
 		globalRunning = platformProcessEvents(&globalBackbuffer);
 
-		SDL_LockAudioStream(globalAudioBuffer.stream);
-		int byteToLock = (globalAudioBuffer.settings.sampleIndex *
-						  globalAudioBuffer.settings.bytesPerSample) %
-						 globalAudioBuffer.size;
-		int targetCursor = ((globalAudioBuffer.readCursor +
-							 (globalAudioBuffer.settings.latencySampleCount *
-							  globalAudioBuffer.settings.bytesPerSample)) %
-							globalAudioBuffer.size);
-		int bytesToWrite;
-		if (byteToLock > targetCursor) {
-			bytesToWrite = (globalAudioBuffer.size - byteToLock);
-			bytesToWrite += targetCursor;
-		} else {
-			bytesToWrite = targetCursor - byteToLock;
-		}
-		platformFillSoundBuffer(&globalAudioBuffer, byteToLock, bytesToWrite);
-		SDL_UnlockAudioStream(globalAudioBuffer.stream);
-
 		platformProcessControllers();
 
 		GameBackbuffer gamebackbuffer = {};
@@ -364,21 +290,49 @@ int main(void) {
 		gamebackbuffer.height = globalBackbuffer.height;
 		gamebackbuffer.pitch = globalBackbuffer.pitch;
 		gamebackbuffer.memory = globalBackbuffer.memory;
-		gameUpdateAndRender(&gamebackbuffer, xOffset, yOffset);
+
+		// Only generate audio if we're actually going to use it
+		if (platformShouldQueueAudioSamples()) {
+			GameSoundBuffer gameSoundBuffer = {};
+			int16_t samples[48000 * 2]; // 1 second max buffer
+			gameSoundBuffer.sampleCount =
+				platformGetSamplesToGenerate(frameStart, lastFrameStart);
+			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
+			gameSoundBuffer.samples = samples;
+
+			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, xOffset,
+								yOffset);
+			platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
+		} else {
+			// No audio needed this frame, just render
+			GameSoundBuffer gameSoundBuffer = {};
+			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, xOffset,
+								yOffset);
+		}
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
 
-		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
 		int64_t frameEnd = SDL_GetPerformanceCounter();
+		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
 		int64_t frameDuration = frameEnd - frameStart;
 		real64 msPerFrame =
 			((real64)frameDuration * 1000) / (real64)perfFrequency;
 		real64 fps = (real64)perfFrequency / (real64)frameDuration;
 
+		// Recalculate queue for debug display
+		int queued = SDL_GetAudioStreamQueued(globalAudioOutput.stream);
+		int queuedSamples =
+			queued / (globalAudioOutput.numChannels * sizeof(int16_t));
+		real64 queuedSeconds =
+			(real64)queuedSamples / (real64)globalAudioOutput.sampleRate;
+
+		lastFrameStart = frameStart;
+
 		u_int64_t endCyclesCount = _rdtsc();
 		u_int64_t cyclesElapsed = endCyclesCount - startCyclesCount;
 
-		printf("ms/frame: %.02f  fps: %.02f  MegaCycles/frame: %lu\n",
-			   msPerFrame, fps, cyclesElapsed / (1000 * 1000));
+		printf("ms/frame: %.02f  fps: %.02f  MegaCycles/frame: %lu  Audio "
+			   "queued: %.3fs\n",
+			   msPerFrame, fps, cyclesElapsed / (1000 * 1000), queuedSeconds);
 	}
 
 	// TODO(bruno): we are not freeing sdl renderer, sdl window and backbuffer
