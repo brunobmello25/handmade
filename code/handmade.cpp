@@ -1,7 +1,7 @@
 #include "handmade.h"
 #include <math.h>
 
-global_variable float PI = 3.14159265359f;
+global_variable real32 PI = 3.14159265359f;
 
 void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
 						 int greenOffset) {
@@ -19,7 +19,7 @@ void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
 	}
 }
 
-void gameOutputSound(GameSoundBuffer *soundBuffer) {
+void gameOutputSound(GameSoundBuffer *soundBuffer, int toneHz) {
 	if (soundBuffer->sampleCount == 0)
 		return;
 
@@ -27,8 +27,7 @@ void gameOutputSound(GameSoundBuffer *soundBuffer) {
 		0.0f; // TODO(bruno): remove this local persist variable
 
 	int toneVolume = 3000;
-	int tonehz = 256;
-	int wavePeriod = soundBuffer->sampleRate / tonehz;
+	int wavePeriod = soundBuffer->sampleRate / toneHz;
 
 	int16_t *sampleOut = soundBuffer->samples;
 
@@ -43,19 +42,26 @@ void gameOutputSound(GameSoundBuffer *soundBuffer) {
 }
 
 void gameUpdateAndRender(GameBackbuffer *backbuffer,
-						 GameSoundBuffer *soundBuffer) {
+						 GameSoundBuffer *soundBuffer, GameInput *input) {
 	// TODO(bruno): Remove these local persists
 	local_persist int blueOffset = 0;
 	local_persist int greenOffset = 0;
+	local_persist int toneHz = 256;
 
-	// input.aButtonEndedDown
-	// input.aButtonHalfTransitionCount
-	if (input.aButtonEndedDown) {
+	GameControllerInput *input0 = &input->controllers[0];
+	if (input0->isAnalog) {
+		blueOffset += (int)(4.0f * input0->endX);
+		toneHz += (int)(256.0f * input0->endY);
+	} else {
 	}
 
-	// TODO(bruno): Allow sample offsets here for more robust
-	// platform options
-	gameOutputSound(soundBuffer);
+	if (input0->down.endedDown) {
+		greenOffset += 1;
+	}
+
+	gameOutputSound(soundBuffer,
+					toneHz); // TODO(bruno): Allow sample offsets here
+							 // for more robust platform options
 
 	renderWeirdGradient(backbuffer, blueOffset, greenOffset);
 }

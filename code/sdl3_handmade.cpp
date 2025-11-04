@@ -17,8 +17,10 @@
  * */
 
 #include "handmade.cpp"
+#include "handmade.h"
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_gamepad.h>
 #include <stdio.h>
 #include <x86intrin.h>
 
@@ -121,6 +123,8 @@ void platformLoadControllers() {
 	int gamepadCount;
 	uint *ids = SDL_GetGamepads(&gamepadCount);
 
+	// TODO: handle proper controller count exceeding the size of game
+	// controllers (which is currently 4)
 	for (int i = 0; i < gamepadCount && i < MAX_CONTROLLERS; i++) {
 		SDL_Gamepad *pad = SDL_OpenGamepad(ids[i]);
 		if (pad) {
@@ -185,8 +189,22 @@ int16_t platformGetAxisWithDeadzone(SDL_Gamepad *pad, SDL_GamepadAxis axis) {
 	return axisValue;
 }
 
-void platformProcessControllers() {
+void processControllerButton(GameButtonState *oldState,
+							 GameButtonState *newState, SDL_Gamepad *pad,
+							 SDL_GamepadButton button) {
+	newState->endedDown = SDL_GetGamepadButton(pad, button);
+	newState->halfTransitionCount =
+		(oldState->endedDown != newState->endedDown) ? 1 : 0;
+}
+
+void platformProcessControllers(GameInput *gameInput) {
+
+	// TODO(bruno): handle this loop when we have more controllers on sdl than
+	// on game
 	for (int i = 0; i < MAX_CONTROLLERS; i++) {
+		GameControllerInput *oldController = &gameInput->controllers[0];
+		GameControllerInput *newController = &gameInput->controllers[0];
+
 		SDL_Gamepad *pad = GamepadHandles[i];
 		if (!pad)
 			continue;
@@ -199,13 +217,16 @@ void platformProcessControllers() {
 		xOffset += stickX / 8192;
 		yOffset += stickY / 8192;
 
-		bool aButton = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_SOUTH);
-		if (aButton) {
-			yOffset += 2;
-			SDL_RumbleGamepad(pad, 20000, 20000, 30);
-		} else {
-			SDL_RumbleGamepad(pad, 0, 0, 0);
-		}
+		processControllerButton(&oldController->down, &newController->down, pad,
+								SDL_GAMEPAD_BUTTON_SOUTH);
+		processControllerButton(&oldController->up, &newController->up, pad,
+								SDL_GAMEPAD_BUTTON_NORTH);
+		processControllerButton(&oldController->left, &newController->left, pad,
+								SDL_GAMEPAD_BUTTON_WEST);
+		processControllerButton(&oldController->right, &newController->right,
+								pad, SDL_GAMEPAD_BUTTON_EAST);
+
+		// TODO(bruno): rumble
 	}
 }
 
@@ -259,6 +280,9 @@ int main(void) {
 		return -1;
 
 	platformLoadControllers();
+	GameInput gameInputs[2];
+	GameInput *newInput = &gameInputs[0];
+	GameInput *oldInput = &gameInputs[1];
 
 	SDL_Window *window = SDL_CreateWindow("Handmade Hero", initialWidth,
 										  initialHeight, SDL_WINDOW_RESIZABLE);
@@ -283,8 +307,6 @@ int main(void) {
 
 		globalRunning = platformProcessEvents(&globalBackbuffer);
 
-		platformProcessControllers();
-
 		GameBackbuffer gamebackbuffer = {};
 		gamebackbuffer.width = globalBackbuffer.width;
 		gamebackbuffer.height = globalBackbuffer.height;
@@ -301,13 +323,18 @@ int main(void) {
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
 
-			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer);
+			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, newInput);
 			platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
 		} else {
 			GameSoundBuffer gameSoundBuffer = {};
-			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer);
+			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, newInput);
 		}
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
+
+		platformProcessControllers(newInput);
+		GameInput *temp = oldInput;
+		oldInput = newInput;
+		newInput = temp;
 
 		int64_t frameEnd = SDL_GetPerformanceCounter();
 		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
