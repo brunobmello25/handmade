@@ -19,7 +19,6 @@
 #include "handmade.cpp"
 
 #include <SDL3/SDL.h>
-#include <cstdint>
 #include <stdio.h>
 #include <x86intrin.h>
 
