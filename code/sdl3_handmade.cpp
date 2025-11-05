@@ -62,7 +62,7 @@ void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 	backbuffer->width = width;
 	backbuffer->height = height;
 	backbuffer->pitch = width * bytesPerPixel;
-	backbuffer->memory = malloc(width * height * bytesPerPixel);
+	backbuffer->memory = calloc(1, width * height * bytesPerPixel);
 	backbuffer->texture =
 		SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
@@ -267,6 +267,20 @@ bool platformShouldQueueAudioSamples() {
 	return queuedSamples < targetQueuedSamples;
 }
 
+bool platformInitializeGameMemory(GameMemory *gameMemory) {
+	gameMemory->permanentStorageSize = Megabytes(64);
+	gameMemory->permanentStorage = calloc(1, gameMemory->permanentStorageSize);
+	if (!gameMemory->permanentStorage)
+		return false;
+
+	gameMemory->transientStorageSize = Gigabytes(4);
+	gameMemory->transientStorage = calloc(1, gameMemory->transientStorageSize);
+	if (!gameMemory->transientStorage)
+		return false;
+
+	return true;
+}
+
 void platformOutputSound(PlatformAudioOutput *audioOutput,
 						 GameSoundBuffer *gameSoundBuffer) {
 	// Push audio data to the stream
@@ -294,6 +308,11 @@ int main(void) {
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL);
 	if (!window || !renderer) // TODO(bruno): proper error handling
 		return -1;
+
+	GameMemory gameMemory = {};
+	if (platformInitializeGameMemory(&gameMemory)) {
+		return -1; // TODO(bruno): proper error handling
+	}
 
 	platformInitializeSound(&globalAudioOutput);
 
@@ -328,11 +347,13 @@ int main(void) {
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
 
-			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, newInput);
+			gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
+								newInput);
 			platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
 		} else {
 			GameSoundBuffer gameSoundBuffer = {};
-			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, newInput);
+			gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
+								newInput);
 		}
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
 

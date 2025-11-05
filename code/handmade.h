@@ -1,6 +1,11 @@
 #ifndef HANDMADE_H
 
+#include <stddef.h>
 #include <stdint.h>
+
+#define Kilobytes(x) ((x) * (size_t)1024)
+#define Megabytes(x) ((x) * (size_t)1024 * (size_t)1024)
+#define Gigabytes(x) ((x) * (size_t)1024 * (size_t)1024 * (size_t)1024)
 
 #define MAX_CONTROLLERS 4
 
@@ -9,6 +14,16 @@
 
 typedef float real32;
 typedef double real64;
+
+struct GameMemory {
+	size_t permanentStorageSize;
+	void *permanentStorage;
+
+	size_t transientStorageSize;
+	void *transientStorage;
+
+	bool isInitialized;
+};
 
 struct GameBackbuffer {
 	int width;
@@ -61,11 +76,11 @@ struct GameInput {
 	GameControllerInput controllers[4];
 };
 
-// receives: timing, input, bitmap to output, sound to output
-void gameUpdateAndRender(GameBackbuffer *backbuffer,
-						 GameSoundBuffer *soundBuffer, GameInput *input);
-
-void gameOutputSound(GameSoundBuffer *soundBuffer, int toneHz);
+struct GameState {
+	int toneHz;
+	int xOffset;
+	int yOffset;
+};
 
 #define HANDMADE_H
 #endif // HANDMADE_H
