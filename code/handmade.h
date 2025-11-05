@@ -88,5 +88,13 @@ struct GameState {
 	int yOffset;
 };
 
+//  NOTE(bruno): services that the platform layer provides to the game
+#if HANDMADE_INTERNAL
+void *DEBUGPlatformReadEntireFile(char *filename);
+void DEBUGPlatformFreeFileMemory(void *memory);
+bool DEBUGPlatformWriteEntireFile(char *filename, void *memory,
+								  size_t memorySize);
+#endif
+
 #define HANDMADE_H
 #endif // HANDMADE_H

@@ -305,6 +305,12 @@ void platformOutputSound(PlatformAudioOutput *audioOutput,
 						   bytesToWrite);
 }
 
+void *DEBUGPlatformReadEntireFile(char *filename) {}
+void DEBUGPlatformFreeFileMemory(void *memory) {}
+
+bool DEBUGPlatformWriteEntireFile(char *filename, void *memory,
+								  size_t memorySize) {}
+
 int main(void) {
 	int initialWidth = 1920 / 2;
 	int initialHeight = 1080 / 2;
