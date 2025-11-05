@@ -1,5 +1,4 @@
 #include "handmade.h"
-#include "handmade_assert.h"
 #include <math.h>
 
 global_variable real32 PI = 3.14159265359f;
