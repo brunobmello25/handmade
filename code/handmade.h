@@ -6,6 +6,7 @@
 
 #define global_variable static
 #define local_persist static
+#define internal static
 
 typedef float real32;
 typedef double real64;
@@ -62,10 +63,11 @@ struct GameInput {
 };
 
 // receives: timing, input, bitmap to output, sound to output
-void gameUpdateAndRender(GameBackbuffer *backbuffer,
-						 GameSoundBuffer *soundBuffer, GameInput *input);
+internal void gameUpdateAndRender(GameBackbuffer *backbuffer,
+								  GameSoundBuffer *soundBuffer,
+								  GameInput *input);
 
-void gameOutputSound(GameSoundBuffer *soundBuffer, int toneHz);
+internal void gameOutputSound(GameSoundBuffer *soundBuffer, int toneHz);
 
 #define HANDMADE_H
 #endif // HANDMADE_H
