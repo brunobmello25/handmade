@@ -22,6 +22,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gamepad.h>
 #include <stdio.h>
+#include <sys/mman.h>
 #include <x86intrin.h>
 
 struct PlatformBackbuffer {
@@ -62,7 +63,7 @@ void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 	backbuffer->width = width;
 	backbuffer->height = height;
 	backbuffer->pitch = width * bytesPerPixel;
-	backbuffer->memory = malloc(width * height * bytesPerPixel);
+	backbuffer->memory = calloc(1, width * height * bytesPerPixel);
 	backbuffer->texture =
 		SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
@@ -267,6 +268,34 @@ bool platformShouldQueueAudioSamples() {
 	return queuedSamples < targetQueuedSamples;
 }
 
+bool platformInitializeGameMemory(GameMemory *gameMemory) {
+	gameMemory->permanentStorageSize = Megabytes(64);
+	gameMemory->transientStorageSize = Gigabytes(4);
+
+	size_t totalSize =
+		gameMemory->permanentStorageSize + gameMemory->transientStorageSize;
+
+#if HANDMADE_INTERNAL
+	void *baseAddress = (void *)Terabytes(2);
+#else
+	void *baseAddress = NULL;
+#endif
+
+	void *memory = mmap(baseAddress, totalSize, PROT_READ | PROT_WRITE,
+						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+	if (memory == MAP_FAILED) {
+		printf("Failed to allocate game memory\n");
+		return false;
+	}
+
+	gameMemory->permanentStorage = memory;
+	gameMemory->transientStorage =
+		(void *)((uint8_t *)memory + gameMemory->permanentStorageSize);
+
+	return true;
+}
+
 void platformOutputSound(PlatformAudioOutput *audioOutput,
 						 GameSoundBuffer *gameSoundBuffer) {
 	// Push audio data to the stream
@@ -294,6 +323,11 @@ int main(void) {
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL);
 	if (!window || !renderer) // TODO(bruno): proper error handling
 		return -1;
+
+	GameMemory gameMemory = {};
+	if (!platformInitializeGameMemory(&gameMemory)) {
+		return -1; // TODO(bruno): proper error handling
+	}
 
 	platformInitializeSound(&globalAudioOutput);
 
@@ -328,11 +362,13 @@ int main(void) {
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
 
-			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, newInput);
+			gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
+								newInput);
 			platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
 		} else {
 			GameSoundBuffer gameSoundBuffer = {};
-			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, newInput);
+			gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
+								newInput);
 		}
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
 
