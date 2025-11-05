@@ -1,8 +1,10 @@
 #include "handmade.h"
 #include <math.h>
 
-void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
-						 int greenOffset) {
+global_variable real32 PI = 3.14159265359f;
+
+internal void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
+								  int greenOffset) {
 	uint8_t *row = (uint8_t *)buffer->memory;
 	for (int y = 0; y < buffer->height; ++y) {
 		uint32_t *pixel = (uint32_t *)row;
@@ -17,7 +19,7 @@ void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
 	}
 }
 
-void gameOutputSound(GameSoundBuffer *soundBuffer) {
+internal void gameOutputSound(GameSoundBuffer *soundBuffer, int toneHz) {
 	if (soundBuffer->sampleCount == 0)
 		return;
 
@@ -25,8 +27,7 @@ void gameOutputSound(GameSoundBuffer *soundBuffer) {
 		0.0f; // TODO(bruno): remove this local persist variable
 
 	int toneVolume = 3000;
-	int tonehz = 256;
-	int wavePeriod = soundBuffer->sampleRate / tonehz;
+	int wavePeriod = soundBuffer->sampleRate / toneHz;
 
 	int16_t *sampleOut = soundBuffer->samples;
 
@@ -40,12 +41,38 @@ void gameOutputSound(GameSoundBuffer *soundBuffer) {
 	}
 }
 
-void gameUpdateAndRender(GameBackbuffer *backbuffer,
-						 GameSoundBuffer *soundBuffer, int xOffset,
-						 int yOffset) {
+internal void gameUpdateAndRender(GameBackbuffer *backbuffer,
+								  GameSoundBuffer *soundBuffer,
+								  GameInput *input) {
+	// TODO(bruno): Remove these local persists
+	local_persist int blueOffset = 0;
+	local_persist int greenOffset = 0;
+	local_persist int toneHz = 256;
 
-	// TODO(bruno): Allow sample offsets here for more robust platform options
-	gameOutputSound(soundBuffer);
+	GameControllerInput *input0 = &input->controllers[0];
+	if (input0->isAnalog) {
+		blueOffset += (int)(4.0f * input0->endX);
+		greenOffset += (int)(4.0f * input0->endY);
+		toneHz = 256 + (int)(256.0f * (input0->endY / 8.0f));
+	} else {
+	}
 
-	renderWeirdGradient(backbuffer, xOffset, yOffset);
+	if (input0->down.endedDown) {
+		greenOffset += 1;
+	}
+	if (input0->up.endedDown) {
+		greenOffset -= 1;
+	}
+	if (input0->left.endedDown) {
+		blueOffset -= 1;
+	}
+	if (input0->right.endedDown) {
+		blueOffset += 1;
+	}
+
+	gameOutputSound(soundBuffer,
+					toneHz); // TODO(bruno): Allow sample offsets here
+							 // for more robust platform options
+
+	renderWeirdGradient(backbuffer, blueOffset, greenOffset);
 }

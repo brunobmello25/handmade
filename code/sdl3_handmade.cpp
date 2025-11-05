@@ -17,13 +17,12 @@
  * */
 
 #include "handmade.cpp"
+#include "handmade.h"
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_gamepad.h>
 #include <stdio.h>
 #include <x86intrin.h>
-
-#define MAX_CONTROLLERS 4
-#define STICK_DEADZONE 8000
 
 struct PlatformBackbuffer {
 	int width;
@@ -47,12 +46,12 @@ global_variable PlatformBackbuffer globalBackbuffer;
 global_variable PlatformAudioOutput globalAudioOutput;
 
 global_variable SDL_Gamepad *GamepadHandles[MAX_CONTROLLERS] = {};
-global_variable int xOffset = 0, yOffset = 0;
 
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
-void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
-							  SDL_Renderer *renderer, int width, int height) {
+internal void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
+									   SDL_Renderer *renderer, int width,
+									   int height) {
 	int bytesPerPixel = sizeof(int);
 
 	if (backbuffer->memory)
@@ -70,7 +69,7 @@ void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
 }
 
-bool platformProcessEvents(PlatformBackbuffer *backbuffer) {
+internal bool platformProcessEvents(PlatformBackbuffer *backbuffer) {
 	SDL_Event event;
 
 	while (SDL_PollEvent(&event)) {
@@ -109,18 +108,20 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer) {
 	return true;
 }
 
-void platformUpdateWindow(PlatformBackbuffer *buffer, SDL_Window *window,
-						  SDL_Renderer *renderer) {
+internal void platformUpdateWindow(PlatformBackbuffer *buffer,
+								   SDL_Window *window, SDL_Renderer *renderer) {
 	SDL_UpdateTexture(buffer->texture, NULL, buffer->memory, buffer->pitch);
 	SDL_RenderTexture(renderer, buffer->texture, 0, 0);
 	SDL_RenderPresent(renderer);
 }
 
-void platformLoadControllers() {
+internal void platformLoadControllers() {
 
 	int gamepadCount;
 	uint *ids = SDL_GetGamepads(&gamepadCount);
 
+	// TODO: handle proper controller count exceeding the size of game
+	// controllers (which is currently 4)
 	for (int i = 0; i < gamepadCount && i < MAX_CONTROLLERS; i++) {
 		SDL_Gamepad *pad = SDL_OpenGamepad(ids[i]);
 		if (pad) {
@@ -129,7 +130,7 @@ void platformLoadControllers() {
 	}
 }
 
-void platformInitializeSound(PlatformAudioOutput *audioOutput) {
+internal void platformInitializeSound(PlatformAudioOutput *audioOutput) {
 	audioOutput->sampleRate = 48000;
 	audioOutput->numChannels = 2;
 
@@ -177,39 +178,67 @@ void platformInitializeSound(PlatformAudioOutput *audioOutput) {
 	SDL_ResumeAudioDevice(audioOutput->device);
 }
 
-int16_t platformGetAxisWithDeadzone(SDL_Gamepad *pad, SDL_GamepadAxis axis) {
-	int16_t axisValue = SDL_GetGamepadAxis(pad, axis);
-	if (abs(axisValue) < STICK_DEADZONE) {
-		axisValue = 0;
-	}
-	return axisValue;
+internal void processControllerButton(GameButtonState *oldState,
+									  GameButtonState *newState,
+									  SDL_Gamepad *pad,
+									  SDL_GamepadButton button) {
+	newState->endedDown = SDL_GetGamepadButton(pad, button);
+	newState->halfTransitionCount =
+		(oldState->endedDown != newState->endedDown) ? 1 : 0;
 }
 
-void platformProcessControllers() {
+internal void platformProcessControllers(GameInput *gameInput) {
+
+	// TODO(bruno): handle this loop when we have more controllers on sdl than
+	// on game
 	for (int i = 0; i < MAX_CONTROLLERS; i++) {
+		GameControllerInput *oldController = &gameInput->controllers[0];
+		GameControllerInput *newController = &gameInput->controllers[0];
+
 		SDL_Gamepad *pad = GamepadHandles[i];
 		if (!pad)
 			continue;
 
-		int16_t stickX =
-			platformGetAxisWithDeadzone(pad, SDL_GAMEPAD_AXIS_LEFTX);
-		int16_t stickY =
-			platformGetAxisWithDeadzone(pad, SDL_GAMEPAD_AXIS_LEFTY);
-
-		xOffset += stickX / 8192;
-		yOffset += stickY / 8192;
-
-		bool aButton = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_SOUTH);
-		if (aButton) {
-			yOffset += 2;
-			SDL_RumbleGamepad(pad, 20000, 20000, 30);
+		// TODO: dpad
+		int16_t sdlStickX = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
+		int16_t sdlStickY = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY);
+		real32 stickX;
+		if (sdlStickX < 0) {
+			stickX = (real32)sdlStickX / 32768.0f;
 		} else {
-			SDL_RumbleGamepad(pad, 0, 0, 0);
+			stickX = (real32)sdlStickX / 32767.0f;
 		}
+		real32 stickY;
+		if (sdlStickY < 0) {
+			stickY = (real32)sdlStickY / 32768.0f;
+		} else {
+			stickY = (real32)sdlStickY / 32767.0f;
+		}
+
+		newController->isAnalog = true;
+		newController->startX = oldController->endX;
+		newController->startY = oldController->endY;
+		// TODO(bruno): min/max macros
+		newController->minX = newController->maxX = newController->endX =
+			stickX;
+		newController->minY = newController->maxY = newController->endY =
+			stickY;
+
+		processControllerButton(&oldController->down, &newController->down, pad,
+								SDL_GAMEPAD_BUTTON_SOUTH);
+		processControllerButton(&oldController->up, &newController->up, pad,
+								SDL_GAMEPAD_BUTTON_NORTH);
+		processControllerButton(&oldController->left, &newController->left, pad,
+								SDL_GAMEPAD_BUTTON_WEST);
+		processControllerButton(&oldController->right, &newController->right,
+								pad, SDL_GAMEPAD_BUTTON_EAST);
+
+		// TODO(bruno): rumble
 	}
 }
 
-int platformGetSamplesToGenerate(int64_t frameStart, int64_t lastFrameStart) {
+internal int platformGetSamplesToGenerate(int64_t frameStart,
+										  int64_t lastFrameStart) {
 	// Always generate audio based on elapsed time
 	u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
 	real64 secondsElapsed =
@@ -227,7 +256,7 @@ int platformGetSamplesToGenerate(int64_t frameStart, int64_t lastFrameStart) {
 	return samplesToGenerate;
 }
 
-bool platformShouldQueueAudioSamples() {
+internal bool platformShouldQueueAudioSamples() {
 
 	// Only push to audio stream if queue is below target (prevent
 	// accumulation)
@@ -241,8 +270,8 @@ bool platformShouldQueueAudioSamples() {
 	return queuedSamples < targetQueuedSamples;
 }
 
-void platformOutputSound(PlatformAudioOutput *audioOutput,
-						 GameSoundBuffer *gameSoundBuffer) {
+internal void platformOutputSound(PlatformAudioOutput *audioOutput,
+								  GameSoundBuffer *gameSoundBuffer) {
 	// Push audio data to the stream
 	int bytesPerSample = audioOutput->numChannels * sizeof(int16_t);
 	int bytesToWrite = gameSoundBuffer->sampleCount * bytesPerSample;
@@ -259,6 +288,9 @@ int main(void) {
 		return -1;
 
 	platformLoadControllers();
+	GameInput gameInputs[2];
+	GameInput *newInput = &gameInputs[0];
+	GameInput *oldInput = &gameInputs[1];
 
 	SDL_Window *window = SDL_CreateWindow("Handmade Hero", initialWidth,
 										  initialHeight, SDL_WINDOW_RESIZABLE);
@@ -283,8 +315,6 @@ int main(void) {
 
 		globalRunning = platformProcessEvents(&globalBackbuffer);
 
-		platformProcessControllers();
-
 		GameBackbuffer gamebackbuffer = {};
 		gamebackbuffer.width = globalBackbuffer.width;
 		gamebackbuffer.height = globalBackbuffer.height;
@@ -294,22 +324,25 @@ int main(void) {
 		// Only generate audio if we're actually going to use it
 		if (platformShouldQueueAudioSamples()) {
 			GameSoundBuffer gameSoundBuffer = {};
-			int16_t samples[48000 * 2]; // 1 second max buffer
+			int16_t samples[48000 * 2]; // TODO(bruno): 1 second max buffer.
+										// make this dynamic later
 			gameSoundBuffer.sampleCount =
 				platformGetSamplesToGenerate(frameStart, lastFrameStart);
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
 
-			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, xOffset,
-								yOffset);
+			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, newInput);
 			platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
 		} else {
-			// No audio needed this frame, just render
 			GameSoundBuffer gameSoundBuffer = {};
-			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, xOffset,
-								yOffset);
+			gameUpdateAndRender(&gamebackbuffer, &gameSoundBuffer, newInput);
 		}
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
+
+		platformProcessControllers(newInput);
+		GameInput *temp = oldInput;
+		oldInput = newInput;
+		newInput = temp;
 
 		int64_t frameEnd = SDL_GetPerformanceCounter();
 		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
