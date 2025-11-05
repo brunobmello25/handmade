@@ -50,6 +50,8 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 		const char *filename = "README.md";
 		DEBUGReadFileResult file = DEBUGPlatformReadEntireFile(filename);
 		if (file.size > 0) {
+			const char *filename2 = "teste.md";
+			DEBUGPlatformWriteEntireFile(filename2, file.size, file.data);
 			DEBUGPlatformFreeFileMemory(file.data);
 		}
 

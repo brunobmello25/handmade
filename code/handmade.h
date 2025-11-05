@@ -105,7 +105,8 @@ struct DEBUGReadFileResult {
 
 DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename);
 void DEBUGPlatformFreeFileMemory(void *memory);
-bool DEBUGPlatformWriteEntireFile(char *filename, u_int32_t size, void *memory);
+bool DEBUGPlatformWriteEntireFile(const char *filename, u_int32_t size,
+								  void *memory);
 #endif
 
 #define HANDMADE_H

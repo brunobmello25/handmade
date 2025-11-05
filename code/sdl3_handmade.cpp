@@ -353,7 +353,7 @@ DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename) {
 
 void DEBUGPlatformFreeFileMemory(void *memory) { free(memory); }
 
-bool DEBUGPlatformWriteEntireFile(char *filename, u_int32_t size,
+bool DEBUGPlatformWriteEntireFile(const char *filename, u_int32_t size,
 								  void *memory) {
 	int handle = open(filename, O_WRONLY | O_CREAT,
 					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
