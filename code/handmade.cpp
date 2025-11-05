@@ -47,6 +47,12 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 
 	GameState *gameState = (GameState *)gameMemory->permanentStorage;
 	if (!gameMemory->isInitialized) {
+		const char *filename = "README.md";
+		DEBUGReadFileResult file = DEBUGPlatformReadEntireFile(filename);
+		if (file.size > 0) {
+			DEBUGPlatformFreeFileMemory(file.data);
+		}
+
 		gameState->toneHz = 256;
 		gameState->xOffset = 0;
 		gameState->yOffset = 0;

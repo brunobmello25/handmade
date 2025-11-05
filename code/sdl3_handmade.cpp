@@ -20,9 +20,13 @@
 #include "handmade.h"
 
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_gamepad.h>
+#include <cstddef>
+#include <fcntl.h>
 #include <stdio.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <x86intrin.h>
 
 struct PlatformBackbuffer {
@@ -305,11 +309,75 @@ void platformOutputSound(PlatformAudioOutput *audioOutput,
 						   bytesToWrite);
 }
 
-void *DEBUGPlatformReadEntireFile(char *filename) {}
-void DEBUGPlatformFreeFileMemory(void *memory) {}
+DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename) {
+	DEBUGReadFileResult result = {};
+	int handle = open(filename, O_RDONLY);
+	if (handle == -1) {
+		return result;
+	}
 
-bool DEBUGPlatformWriteEntireFile(char *filename, void *memory,
-								  size_t memorySize) {}
+	struct stat status;
+	if (fstat(handle, &status) == -1) {
+		close(handle);
+		return result;
+	}
+
+	result.size = safeTruncateUint64(status.st_size);
+
+	result.data = malloc(result.size);
+	if (!result.data) {
+		close(handle);
+		result.size = 0;
+		return result;
+	}
+
+	size_t bytesToRead = result.size;
+	u_int8_t *nextByteLocation = (u_int8_t *)result.data;
+	while (bytesToRead) {
+		ssize_t bytesRead = read(handle, nextByteLocation, bytesToRead);
+		if (bytesRead == -1) {
+			free(result.data);
+			result.data = 0;
+			result.size = 0;
+			close(handle);
+			return result;
+		}
+
+		bytesToRead -= bytesRead;
+		nextByteLocation += bytesRead;
+	}
+
+	close(handle);
+	return result;
+}
+
+void DEBUGPlatformFreeFileMemory(void *memory) { free(memory); }
+
+bool DEBUGPlatformWriteEntireFile(char *filename, u_int32_t size,
+								  void *memory) {
+	int handle = open(filename, O_WRONLY | O_CREAT,
+					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+	if (handle == -1) {
+		return false;
+	}
+
+	u_int32_t bytesToWrite = size;
+	u_int8_t *nextByteLocation = (u_int8_t *)memory;
+	while (bytesToWrite) {
+		ssize_t bytesWritten = write(handle, nextByteLocation, bytesToWrite);
+		if (bytesWritten == -1) {
+			close(handle);
+			return false;
+		}
+
+		bytesToWrite -= bytesWritten;
+		nextByteLocation += bytesWritten;
+	}
+
+	close(handle);
+	return true;
+}
 
 int main(void) {
 	int initialWidth = 1920 / 2;

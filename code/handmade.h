@@ -1,3 +1,4 @@
+#include <sys/types.h>
 #ifndef HANDMADE_H
 
 #include <stddef.h>
@@ -17,6 +18,13 @@
 
 #define global_variable static
 #define local_persist static
+
+inline u_int32_t safeTruncateUint64(u_int64_t value) {
+	assert(value <=
+		   0xFFFFFFFF); // TODO(bruno): defines for max values like u_int32_max
+	u_int32_t result = (u_int32_t)value;
+	return result;
+}
 
 typedef float real32;
 typedef double real64;
@@ -90,10 +98,14 @@ struct GameState {
 
 //  NOTE(bruno): services that the platform layer provides to the game
 #if HANDMADE_INTERNAL
-void *DEBUGPlatformReadEntireFile(char *filename);
+struct DEBUGReadFileResult {
+	size_t size;
+	void *data;
+};
+
+DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename);
 void DEBUGPlatformFreeFileMemory(void *memory);
-bool DEBUGPlatformWriteEntireFile(char *filename, void *memory,
-								  size_t memorySize);
+bool DEBUGPlatformWriteEntireFile(char *filename, u_int32_t size, void *memory);
 #endif
 
 #define HANDMADE_H
