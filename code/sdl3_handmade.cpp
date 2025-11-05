@@ -49,9 +49,8 @@ global_variable SDL_Gamepad *GamepadHandles[MAX_CONTROLLERS] = {};
 
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
-internal void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
-									   SDL_Renderer *renderer, int width,
-									   int height) {
+void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
+							  SDL_Renderer *renderer, int width, int height) {
 	int bytesPerPixel = sizeof(int);
 
 	if (backbuffer->memory)
@@ -69,7 +68,7 @@ internal void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
 }
 
-internal bool platformProcessEvents(PlatformBackbuffer *backbuffer) {
+bool platformProcessEvents(PlatformBackbuffer *backbuffer) {
 	SDL_Event event;
 
 	while (SDL_PollEvent(&event)) {
@@ -108,14 +107,14 @@ internal bool platformProcessEvents(PlatformBackbuffer *backbuffer) {
 	return true;
 }
 
-internal void platformUpdateWindow(PlatformBackbuffer *buffer,
-								   SDL_Window *window, SDL_Renderer *renderer) {
+void platformUpdateWindow(PlatformBackbuffer *buffer, SDL_Window *window,
+						  SDL_Renderer *renderer) {
 	SDL_UpdateTexture(buffer->texture, NULL, buffer->memory, buffer->pitch);
 	SDL_RenderTexture(renderer, buffer->texture, 0, 0);
 	SDL_RenderPresent(renderer);
 }
 
-internal void platformLoadControllers() {
+void platformLoadControllers() {
 
 	int gamepadCount;
 	uint *ids = SDL_GetGamepads(&gamepadCount);
@@ -130,7 +129,7 @@ internal void platformLoadControllers() {
 	}
 }
 
-internal void platformInitializeSound(PlatformAudioOutput *audioOutput) {
+void platformInitializeSound(PlatformAudioOutput *audioOutput) {
 	audioOutput->sampleRate = 48000;
 	audioOutput->numChannels = 2;
 
@@ -178,16 +177,15 @@ internal void platformInitializeSound(PlatformAudioOutput *audioOutput) {
 	SDL_ResumeAudioDevice(audioOutput->device);
 }
 
-internal void processControllerButton(GameButtonState *oldState,
-									  GameButtonState *newState,
-									  SDL_Gamepad *pad,
-									  SDL_GamepadButton button) {
+void processControllerButton(GameButtonState *oldState,
+							 GameButtonState *newState, SDL_Gamepad *pad,
+							 SDL_GamepadButton button) {
 	newState->endedDown = SDL_GetGamepadButton(pad, button);
 	newState->halfTransitionCount =
 		(oldState->endedDown != newState->endedDown) ? 1 : 0;
 }
 
-internal void platformProcessControllers(GameInput *gameInput) {
+void platformProcessControllers(GameInput *gameInput) {
 
 	// TODO(bruno): handle this loop when we have more controllers on sdl than
 	// on game
@@ -237,8 +235,7 @@ internal void platformProcessControllers(GameInput *gameInput) {
 	}
 }
 
-internal int platformGetSamplesToGenerate(int64_t frameStart,
-										  int64_t lastFrameStart) {
+int platformGetSamplesToGenerate(int64_t frameStart, int64_t lastFrameStart) {
 	// Always generate audio based on elapsed time
 	u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
 	real64 secondsElapsed =
@@ -256,7 +253,7 @@ internal int platformGetSamplesToGenerate(int64_t frameStart,
 	return samplesToGenerate;
 }
 
-internal bool platformShouldQueueAudioSamples() {
+bool platformShouldQueueAudioSamples() {
 
 	// Only push to audio stream if queue is below target (prevent
 	// accumulation)
@@ -270,8 +267,8 @@ internal bool platformShouldQueueAudioSamples() {
 	return queuedSamples < targetQueuedSamples;
 }
 
-internal void platformOutputSound(PlatformAudioOutput *audioOutput,
-								  GameSoundBuffer *gameSoundBuffer) {
+void platformOutputSound(PlatformAudioOutput *audioOutput,
+						 GameSoundBuffer *gameSoundBuffer) {
 	// Push audio data to the stream
 	int bytesPerSample = audioOutput->numChannels * sizeof(int16_t);
 	int bytesToWrite = gameSoundBuffer->sampleCount * bytesPerSample;

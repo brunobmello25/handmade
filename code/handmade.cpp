@@ -3,8 +3,8 @@
 
 global_variable real32 PI = 3.14159265359f;
 
-internal void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
-								  int greenOffset) {
+void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
+						 int greenOffset) {
 	uint8_t *row = (uint8_t *)buffer->memory;
 	for (int y = 0; y < buffer->height; ++y) {
 		uint32_t *pixel = (uint32_t *)row;
@@ -19,7 +19,7 @@ internal void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
 	}
 }
 
-internal void gameOutputSound(GameSoundBuffer *soundBuffer, int toneHz) {
+void gameOutputSound(GameSoundBuffer *soundBuffer, int toneHz) {
 	if (soundBuffer->sampleCount == 0)
 		return;
 
@@ -41,9 +41,8 @@ internal void gameOutputSound(GameSoundBuffer *soundBuffer, int toneHz) {
 	}
 }
 
-internal void gameUpdateAndRender(GameBackbuffer *backbuffer,
-								  GameSoundBuffer *soundBuffer,
-								  GameInput *input) {
+void gameUpdateAndRender(GameBackbuffer *backbuffer,
+						 GameSoundBuffer *soundBuffer, GameInput *input) {
 	// TODO(bruno): Remove these local persists
 	local_persist int blueOffset = 0;
 	local_persist int greenOffset = 0;
