@@ -22,6 +22,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gamepad.h>
 #include <stdio.h>
+#include <sys/mman.h>
 #include <x86intrin.h>
 
 struct PlatformBackbuffer {
@@ -269,14 +270,28 @@ bool platformShouldQueueAudioSamples() {
 
 bool platformInitializeGameMemory(GameMemory *gameMemory) {
 	gameMemory->permanentStorageSize = Megabytes(64);
-	gameMemory->permanentStorage = calloc(1, gameMemory->permanentStorageSize);
-	if (!gameMemory->permanentStorage)
-		return false;
-
 	gameMemory->transientStorageSize = Gigabytes(4);
-	gameMemory->transientStorage = calloc(1, gameMemory->transientStorageSize);
-	if (!gameMemory->transientStorage)
+
+	size_t totalSize =
+		gameMemory->permanentStorageSize + gameMemory->transientStorageSize;
+
+#if HANDMADE_INTERNAL
+	void *baseAddress = (void *)Terabytes(2);
+#else
+	void *baseAddress = NULL;
+#endif
+
+	void *memory = mmap(baseAddress, totalSize, PROT_READ | PROT_WRITE,
+						MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+	if (memory == MAP_FAILED) {
+		printf("Failed to allocate game memory\n");
 		return false;
+	}
+
+	gameMemory->permanentStorage = memory;
+	gameMemory->transientStorage =
+		(void *)((uint8_t *)memory + gameMemory->permanentStorageSize);
 
 	return true;
 }
@@ -310,7 +325,7 @@ int main(void) {
 		return -1;
 
 	GameMemory gameMemory = {};
-	if (platformInitializeGameMemory(&gameMemory)) {
+	if (!platformInitializeGameMemory(&gameMemory)) {
 		return -1; // TODO(bruno): proper error handling
 	}
 

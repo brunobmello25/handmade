@@ -28,7 +28,7 @@ pushd ./target/
 case $PLATFORM in
     "sdl3")
         echo "Compiling SDL3 version (system)..."
-        bear -- c++ ../code/sdl3_handmade.cpp -o handmade -g `pkg-config sdl3 --cflags --libs` -Wall
+        bear -- c++ -DHANDMADE_SLOW=1 -DHANDMADE_INTERNAL=1 ../code/sdl3_handmade.cpp -o handmade -g `pkg-config sdl3 --cflags --libs` -Wall
         ;;
     "sdl3-local")
         echo "Compiling SDL3 version (local)..."
@@ -40,7 +40,7 @@ case $PLATFORM in
         fi
         SDL3_CFLAGS="-I$SDL3_LOCAL/include"
         SDL3_LIBS="-L$SDL3_LOCAL/lib -lSDL3 -Wl,-rpath,$SDL3_LOCAL/lib"
-        bear -- c++ ../code/sdl3_handmade.cpp -o handmade -g $SDL3_CFLAGS $SDL3_LIBS -Wall
+        bear -- c++ -DHANDMADE_SLOW=1 -DHANDMADE_INTERNAL=1 ../code/sdl3_handmade.cpp -o handmade -g $SDL3_CFLAGS $SDL3_LIBS -Wall
         ;;
 esac
 

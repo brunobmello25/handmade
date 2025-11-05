@@ -4,8 +4,9 @@
 #include <stdint.h>
 
 #define Kilobytes(x) ((x) * (size_t)1024)
-#define Megabytes(x) ((x) * (size_t)1024 * (size_t)1024)
-#define Gigabytes(x) ((x) * (size_t)1024 * (size_t)1024 * (size_t)1024)
+#define Megabytes(x) (Kilobytes(x) * (size_t)1024)
+#define Gigabytes(x) (Megabytes(x) * (size_t)1024)
+#define Terabytes(x) (Gigabytes(x) * (size_t)1024)
 
 #define MAX_CONTROLLERS 4
 

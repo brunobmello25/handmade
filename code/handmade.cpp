@@ -1,4 +1,5 @@
 #include "handmade.h"
+#include "handmade_assert.h"
 #include <math.h>
 
 global_variable real32 PI = 3.14159265359f;
@@ -43,6 +44,8 @@ void gameOutputSound(GameSoundBuffer *soundBuffer, int toneHz) {
 
 void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 						 GameSoundBuffer *soundBuffer, GameInput *input) {
+	assert(sizeof(GameState) <= gameMemory->permanentStorageSize);
+
 	GameState *gameState = (GameState *)gameMemory->permanentStorage;
 	if (!gameMemory->isInitialized) {
 		gameState->toneHz = 256;
