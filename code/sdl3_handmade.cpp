@@ -24,9 +24,6 @@
 #include <stdio.h>
 #include <x86intrin.h>
 
-#define MAX_CONTROLLERS 4
-#define STICK_DEADZONE 8000
-
 struct PlatformBackbuffer {
 	int width;
 	int height;
@@ -49,7 +46,6 @@ global_variable PlatformBackbuffer globalBackbuffer;
 global_variable PlatformAudioOutput globalAudioOutput;
 
 global_variable SDL_Gamepad *GamepadHandles[MAX_CONTROLLERS] = {};
-global_variable int xOffset = 0, yOffset = 0;
 
 // function that gets called everytime the window size changes, and also
 // at first time, in order to allocate the backbuffer with proper dimensions
@@ -181,14 +177,6 @@ void platformInitializeSound(PlatformAudioOutput *audioOutput) {
 	SDL_ResumeAudioDevice(audioOutput->device);
 }
 
-int16_t platformGetAxisWithDeadzone(SDL_Gamepad *pad, SDL_GamepadAxis axis) {
-	int16_t axisValue = SDL_GetGamepadAxis(pad, axis);
-	if (abs(axisValue) < STICK_DEADZONE) {
-		axisValue = 0;
-	}
-	return axisValue;
-}
-
 void processControllerButton(GameButtonState *oldState,
 							 GameButtonState *newState, SDL_Gamepad *pad,
 							 SDL_GamepadButton button) {
@@ -209,13 +197,30 @@ void platformProcessControllers(GameInput *gameInput) {
 		if (!pad)
 			continue;
 
-		int16_t stickX =
-			platformGetAxisWithDeadzone(pad, SDL_GAMEPAD_AXIS_LEFTX);
-		int16_t stickY =
-			platformGetAxisWithDeadzone(pad, SDL_GAMEPAD_AXIS_LEFTY);
+		// TODO: dpad
+		int16_t sdlStickX = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
+		int16_t sdlStickY = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY);
+		real32 stickX;
+		if (sdlStickX < 0) {
+			stickX = (real32)sdlStickX / 32768.0f;
+		} else {
+			stickX = (real32)sdlStickX / 32767.0f;
+		}
+		real32 stickY;
+		if (sdlStickY < 0) {
+			stickY = (real32)sdlStickY / 32768.0f;
+		} else {
+			stickY = (real32)sdlStickY / 32767.0f;
+		}
 
-		xOffset += stickX / 8192;
-		yOffset += stickY / 8192;
+		newController->isAnalog = true;
+		newController->startX = oldController->endX;
+		newController->startY = oldController->endY;
+		// TODO(bruno): min/max macros
+		newController->minX = newController->maxX = newController->endX =
+			stickX;
+		newController->minY = newController->maxY = newController->endY =
+			stickY;
 
 		processControllerButton(&oldController->down, &newController->down, pad,
 								SDL_GAMEPAD_BUTTON_SOUTH);

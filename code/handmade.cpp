@@ -51,12 +51,22 @@ void gameUpdateAndRender(GameBackbuffer *backbuffer,
 	GameControllerInput *input0 = &input->controllers[0];
 	if (input0->isAnalog) {
 		blueOffset += (int)(4.0f * input0->endX);
-		toneHz += (int)(256.0f * input0->endY);
+		greenOffset += (int)(4.0f * input0->endY);
+		toneHz = 256 + (int)(256.0f * (input0->endY / 8.0f));
 	} else {
 	}
 
 	if (input0->down.endedDown) {
 		greenOffset += 1;
+	}
+	if (input0->up.endedDown) {
+		greenOffset -= 1;
+	}
+	if (input0->left.endedDown) {
+		blueOffset -= 1;
+	}
+	if (input0->right.endedDown) {
+		blueOffset += 1;
 	}
 
 	gameOutputSound(soundBuffer,

@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#define MAX_CONTROLLERS 4
+
 #define global_variable static
 #define local_persist static
 
