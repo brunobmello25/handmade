@@ -331,7 +331,7 @@ DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename) {
 		return result;
 	}
 
-	size_t bytesToRead = result.size;
+	ssize_t bytesToRead = result.size;
 	u_int8_t *nextByteLocation = (u_int8_t *)result.data;
 	while (bytesToRead) {
 		ssize_t bytesRead = read(handle, nextByteLocation, bytesToRead);
@@ -362,7 +362,7 @@ bool DEBUGPlatformWriteEntireFile(const char *filename, u_int32_t size,
 		return false;
 	}
 
-	u_int32_t bytesToWrite = size;
+	ssize_t bytesToWrite = size;
 	u_int8_t *nextByteLocation = (u_int8_t *)memory;
 	while (bytesToWrite) {
 		ssize_t bytesWritten = write(handle, nextByteLocation, bytesToWrite);
