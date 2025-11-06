@@ -4,5 +4,7 @@ target
 handmade
 core.*
 
+teste.md
+
 # External dependencies
 external/
