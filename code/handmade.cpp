@@ -62,12 +62,12 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 		gameMemory->isInitialized = true;
 	}
 
-	GameControllerInput *input0 = &input->controllers[0];
+	GameControllerInput *input0 =
+		&input->controllers[1]; // TODO(bruno): remove this hardcoded index
 	if (input0->isAnalog) {
 		gameState->xOffset += (int)(4.0f * input0->endX);
 		gameState->yOffset += (int)(4.0f * input0->endY);
 		gameState->toneHz = 256 + (int)(256.0f * (input0->endY / 8.0f));
-	} else {
 	}
 
 	if (input0->down.endedDown) {

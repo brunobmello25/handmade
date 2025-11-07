@@ -9,6 +9,8 @@
 		*(int *)0 = 0;                                                         \
 	}
 
+#define arraylength(array) (sizeof(array) / sizeof((array)[0]))
+
 #define Kilobytes(x) ((x) * (size_t)1024)
 #define Megabytes(x) (Kilobytes(x) * (size_t)1024)
 #define Gigabytes(x) (Megabytes(x) * (size_t)1024)
@@ -87,7 +89,7 @@ struct GameControllerInput {
 };
 
 struct GameInput {
-	GameControllerInput controllers[4];
+	GameControllerInput controllers[MAX_CONTROLLERS + 1];
 };
 
 struct GameState {

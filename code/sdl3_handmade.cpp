@@ -195,8 +195,8 @@ void platformProcessControllers(GameInput *gameInput) {
 	// TODO(bruno): handle this loop when we have more controllers on sdl than
 	// on game
 	for (int i = 0; i < MAX_CONTROLLERS; i++) {
-		GameControllerInput *oldController = &gameInput->controllers[0];
-		GameControllerInput *newController = &gameInput->controllers[0];
+		GameControllerInput *oldController = &gameInput->controllers[i + 1];
+		GameControllerInput *newController = &gameInput->controllers[i + 1];
 
 		SDL_Gamepad *pad = GamepadHandles[i];
 		if (!pad)
@@ -389,6 +389,8 @@ int main(void) {
 
 	platformLoadControllers();
 	GameInput gameInputs[2];
+	gameInputs[0] = {};
+	gameInputs[1] = {};
 	GameInput *newInput = &gameInputs[0];
 	GameInput *oldInput = &gameInputs[1];
 
@@ -470,9 +472,11 @@ int main(void) {
 		u_int64_t endCyclesCount = _rdtsc();
 		u_int64_t cyclesElapsed = endCyclesCount - startCyclesCount;
 
+#if HANDMADE_PRINTDEBUG
 		printf("ms/frame: %.02f  fps: %.02f  MegaCycles/frame: %lu  Audio "
 			   "queued: %.3fs\n",
 			   msPerFrame, fps, cyclesElapsed / (1000 * 1000), queuedSeconds);
+#endif
 	}
 
 	// TODO(bruno): we are not freeing sdl renderer, sdl window and backbuffer
