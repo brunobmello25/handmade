@@ -93,6 +93,9 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 			if (event.key.key == SDLK_ESCAPE)
 				return false;
 
+			if (event.key.repeat)
+				continue;
+
 			bool isDown = (event.type == SDL_EVENT_KEY_DOWN);
 
 			if (event.key.key == SDLK_W)
