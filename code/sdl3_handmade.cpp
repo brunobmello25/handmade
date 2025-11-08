@@ -342,6 +342,8 @@ bool platformInitializeGameMemory(GameMemory *gameMemory) {
 
 void platformOutputSound(PlatformAudioOutput *audioOutput,
 						 GameSoundBuffer *gameSoundBuffer) {
+	if (!gameSoundBuffer->samples || gameSoundBuffer->sampleCount == 0)
+		return;
 	// Push audio data to the stream
 	int bytesPerSample = audioOutput->numChannels * sizeof(int16_t);
 	int bytesToWrite = gameSoundBuffer->sampleCount * bytesPerSample;
@@ -419,6 +421,43 @@ bool DEBUGPlatformWriteEntireFile(const char *filename, u_int32_t size,
 	return true;
 }
 
+int platformGetDisplayRefreshRate(SDL_Window *window) {
+	int defaultRefreshRate = 60;
+
+	SDL_DisplayID displayID = SDL_GetDisplayForWindow(window);
+	if (!displayID) {
+		return defaultRefreshRate;
+	}
+
+	const SDL_DisplayMode *mode = SDL_GetDesktopDisplayMode(displayID);
+
+	if (!mode || mode->refresh_rate <= 0) {
+		return defaultRefreshRate;
+	}
+
+	return mode->refresh_rate;
+}
+
+real32 platformGetSecondsElapsed(int64_t oldCounter, int64_t currentCounter) {
+	return ((real32)(currentCounter - oldCounter) /
+			(real32)SDL_GetPerformanceFrequency());
+}
+
+inline void platformDelayFrame(int64_t frameStart,
+							   real32 targetSecondsPerFrame) {
+
+	real32 secondsElapsed =
+		platformGetSecondsElapsed(frameStart, SDL_GetPerformanceCounter());
+
+	if (secondsElapsed < targetSecondsPerFrame) {
+		u_int32_t msToSleep =
+			(u_int32_t)((targetSecondsPerFrame - secondsElapsed) * 1000.0f);
+		if (msToSleep > 0) {
+			SDL_Delay(msToSleep);
+		}
+	}
+}
+
 int main(void) {
 	int initialWidth = 1920 / 2;
 	int initialHeight = 1080 / 2;
@@ -439,6 +478,13 @@ int main(void) {
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL);
 	if (!window || !renderer) // TODO(bruno): proper error handling
 		return -1;
+	if (!SDL_SetRenderVSync(renderer, 1)) {
+		printf("Failed to set vsync on renderer: %s\n", SDL_GetError());
+	}
+
+	int refreshRate = platformGetDisplayRefreshRate(window);
+	int gameUpdateHz = 30; // TODO(bruno): make this dynamic
+	real32 targetSecondsPerFrame = 1.0f / (real32)gameUpdateHz;
 
 	GameMemory gameMemory = {};
 	if (!platformInitializeGameMemory(&gameMemory)) {
@@ -456,7 +502,6 @@ int main(void) {
 	int64_t lastFrameStart = SDL_GetPerformanceCounter();
 
 	while (globalRunning) {
-
 		int64_t frameStart = SDL_GetPerformanceCounter();
 		uint64_t startCyclesCount = _rdtsc();
 
@@ -482,24 +527,22 @@ int main(void) {
 		gamebackbuffer.memory = globalBackbuffer.memory;
 
 		// Only generate audio if we're actually going to use it
+		GameSoundBuffer gameSoundBuffer = {};
+		int16_t samples[48000 * 2]; // TODO(bruno): 1 second max buffer.
 		if (platformShouldQueueAudioSamples()) {
-			GameSoundBuffer gameSoundBuffer = {};
-			int16_t samples[48000 * 2]; // TODO(bruno): 1 second max buffer.
-										// make this dynamic later
+			// make this dynamic later
 			gameSoundBuffer.sampleCount =
 				platformGetSamplesToGenerate(frameStart, lastFrameStart);
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
-
-			gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
-								newInput);
-			platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
-		} else {
-			GameSoundBuffer gameSoundBuffer = {};
-			gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
-								newInput);
 		}
+		gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
+							newInput);
+		platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
+
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
+
+		platformDelayFrame(frameStart, targetSecondsPerFrame);
 
 		int64_t frameEnd = SDL_GetPerformanceCounter();
 		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();

@@ -62,23 +62,26 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 		gameMemory->isInitialized = true;
 	}
 
+	int moveSpeed = 8;
 	for (size_t i = 0; i < arraylength(input->controllers); i++) {
 		GameControllerInput *controller = gameGetController(input, i);
 
 		if (controller->isAnalog) {
-			gameState->xOffset += (int)(4.0f * controller->stickAverageX);
-			gameState->yOffset += (int)(4.0f * controller->stickAverageY);
+			gameState->xOffset +=
+				(int)((real32)moveSpeed * controller->stickAverageX);
+			gameState->yOffset +=
+				(int)((real32)moveSpeed * controller->stickAverageY);
 			gameState->toneHz =
 				256 + (int)(256.0f * (controller->stickAverageY / 8.0f));
 		} else {
 			if (controller->moveUp.endedDown)
-				gameState->yOffset -= 4;
+				gameState->yOffset -= moveSpeed;
 			if (controller->moveDown.endedDown)
-				gameState->yOffset += 4;
+				gameState->yOffset += moveSpeed;
 			if (controller->moveLeft.endedDown)
-				gameState->xOffset -= 4;
+				gameState->xOffset -= moveSpeed;
 			if (controller->moveRight.endedDown)
-				gameState->xOffset += 4;
+				gameState->xOffset += moveSpeed;
 		}
 	}
 
