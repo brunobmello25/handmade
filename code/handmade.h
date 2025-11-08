@@ -1,8 +1,8 @@
-#include <sys/types.h>
 #ifndef HANDMADE_H
 
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 #define assert(expression)                                                     \
 	if (!(expression)) {                                                       \

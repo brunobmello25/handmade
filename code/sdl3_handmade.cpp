@@ -20,7 +20,6 @@
 #include "handmade.h"
 
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_gamepad.h>
 #include <cstddef>
 #include <fcntl.h>
 #include <stdio.h>
@@ -210,13 +209,17 @@ void platformProcessControllers(GameInput *gameInput) {
 		bool dpadUp = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_UP);
 		bool dpadDown = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
 		bool dpadLeft = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
-		bool dpadRight = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+		bool dpadRight =
+			SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
 
-		processControllerButton(&oldController->moveUp, &newController->moveUp, dpadUp);
-		processControllerButton(&oldController->moveDown, &newController->moveDown, dpadDown);
-		processControllerButton(&oldController->moveLeft, &newController->moveLeft, dpadLeft);
-		processControllerButton(&oldController->moveRight, &newController->moveRight, dpadRight);
-
+		processControllerButton(&oldController->moveUp, &newController->moveUp,
+								dpadUp);
+		processControllerButton(&oldController->moveDown,
+								&newController->moveDown, dpadDown);
+		processControllerButton(&oldController->moveLeft,
+								&newController->moveLeft, dpadLeft);
+		processControllerButton(&oldController->moveRight,
+								&newController->moveRight, dpadRight);
 
 		int16_t sdlStickX = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
 		int16_t sdlStickY = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY);
