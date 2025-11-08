@@ -35,22 +35,12 @@ pushd ./target/
 
 COMMON_FLAGS="-DHANDMADE_PRINTDEBUG=0 -DHANDMADE_SLOW=1 -DHANDMADE_INTERNAL=1 -g -Wall -Wno-unused-variable -Wno-write-strings -Werror -fno-rtti -fno-exceptions"
 
-# Set architecture-specific flags
-if [[ "$ARCH" == "32" ]]; then
-    ARCH_FLAGS="-m32"
-    ARCH_SUFFIX=".x86"
-    RPATH_DIR='$ORIGIN/x86'
-else
-    ARCH_FLAGS=""
-    ARCH_SUFFIX=""
-    RPATH_DIR='$ORIGIN/x86_64'
-fi
-
 case $PLATFORM in
     "sdl3")
         echo "Compiling SDL3 version (system)..."
-        bear -- c++ $COMMON_FLAGS $ARCH_FLAGS -fPIC -shared ../code/handmade.cpp -o handmade.so
-        bear -- c++ $COMMON_FLAGS $ARCH_FLAGS ../code/sdl3_handmade.cpp -o handmade$ARCH_SUFFIX `pkg-config sdl3 --cflags --libs` -Wl,-rpath,"$RPATH_DIR" -ldl
+        bear -- c++ $COMMON_FLAGS -fPIC -shared ../code/handmade.cpp -o handmade_temp.so
+        mv handmade_temp.so handmade.so
+        bear -- c++ $COMMON_FLAGS ../code/sdl3_handmade.cpp -o handmade `pkg-config sdl3 --cflags --libs` -Wl,-rpath -ldl
         ;;
     "sdl3-local")
         echo "Compiling SDL3 version (local)..."
@@ -62,7 +52,7 @@ case $PLATFORM in
         fi
         SDL3_CFLAGS="-I$SDL3_LOCAL/include"
         SDL3_LIBS="-L$SDL3_LOCAL/lib -lSDL3 -Wl,-rpath,$SDL3_LOCAL/lib"
-        bear -- c++ $COMMON_FLAGS $ARCH_FLAGS ../code/sdl3_handmade.cpp -o handmade$ARCH_SUFFIX $SDL3_CFLAGS $SDL3_LIBS -Wl,-rpath,"$RPATH_DIR"
+        bear -- c++ $COMMON_FLAGS ../code/sdl3_handmade.cpp -o handmade $SDL3_CFLAGS $SDL3_LIBS -Wl,-rpath
         ;;
 esac
 

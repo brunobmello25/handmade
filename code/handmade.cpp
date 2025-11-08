@@ -19,25 +19,25 @@ void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
 	}
 }
 
-void gameOutputSound(GameSoundBuffer *soundBuffer, int toneHz) {
+void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 	if (soundBuffer->sampleCount == 0)
 		return;
 
-	local_persist real32 tsine =
-		0.0f; // TODO(bruno): remove this local persist variable
-
 	int toneVolume = 3000;
-	int wavePeriod = soundBuffer->sampleRate / toneHz;
+	int wavePeriod = soundBuffer->sampleRate / gameState->toneHz;
 
 	int16_t *sampleOut = soundBuffer->samples;
 
 	for (int i = 0; i < soundBuffer->sampleCount; i++) {
-		real32 sineValue = sinf(tsine);
+		real32 sineValue = sinf(gameState->tsine);
 		int16_t sampleValue = (int16_t)(sineValue * toneVolume);
 		*sampleOut++ = sampleValue;
 		*sampleOut++ = sampleValue;
 
-		tsine += 2.0f * PI * 1.0f / (real32)wavePeriod;
+		gameState->tsine += 2.0f * PI * 1.0f / (real32)wavePeriod;
+		if (gameState->tsine > 2.0f * PI) {
+			gameState->tsine -= 2.0f * PI;
+		}
 	}
 }
 
@@ -60,6 +60,7 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 		gameState->toneHz = 256;
 		gameState->xOffset = 0;
 		gameState->yOffset = 0;
+		gameState->tsine = 0.0f;
 
 		gameMemory->isInitialized = true;
 	}
@@ -88,8 +89,8 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	}
 
 	gameOutputSound(soundBuffer,
-					gameState->toneHz); // TODO(bruno): Allow sample offsets
-										// here for more robust platform options
+					gameState); // TODO(bruno): Allow sample offsets
+								// here for more robust platform options
 
 	renderWeirdGradient(backbuffer, gameState->xOffset, gameState->yOffset);
 }

@@ -531,14 +531,16 @@ inline void platformDelayFrame(int64_t frameStart,
 	}
 }
 
-bool platformLoadGameCode(PlatformGameCode *platformGameCode) {
+void platformUnloadGameCode(PlatformGameCode *platformGameCode) {
 	if (platformGameCode->loaded) {
 		dlclose(platformGameCode->gameLib);
 		platformGameCode->loaded = false;
 		platformGameCode->gameLib = NULL;
 		platformGameCode->gameUpdateAndRender = NULL;
 	}
+}
 
+bool platformLoadGameCode(PlatformGameCode *platformGameCode) {
 	platformGameCode->gameLib = dlopen("./target/handmade.so", RTLD_LAZY);
 	if (!platformGameCode->gameLib)
 		return false;
@@ -561,12 +563,6 @@ int main(void) {
 	int initialWidth = 1920 / 2;
 	int initialHeight = 1080 / 2;
 
-	PlatformGameCode gameCode = {};
-	if (!platformLoadGameCode(&gameCode)) {
-		// TODO(bruno): proper error handling
-		return -1;
-	}
-
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD |
 				  SDL_INIT_AUDIO))
 		return -1;
@@ -588,8 +584,10 @@ int main(void) {
 	}
 
 	int refreshRate = platformGetDisplayRefreshRate(window);
-	int gameUpdateHz = 30; // TODO(bruno): make this dynamic
-	real32 targetSecondsPerFrame = 1.0f / (real32)gameUpdateHz;
+	real32 targetSecondsPerFrame =
+		1.0f / (real32)refreshRate; // TODO(bruno): change the game refresh rate
+									// based on the hardware capacity: if it's
+									// too slow, lower it to 30fps
 
 	GameMemory gameMemory = {};
 	if (!platformInitializeGameMemory(&gameMemory)) {
@@ -606,7 +604,12 @@ int main(void) {
 
 	int64_t lastFrameStart = SDL_GetPerformanceCounter();
 
+	PlatformGameCode gameCode = {};
+
 	while (globalRunning) {
+		platformUnloadGameCode(&gameCode);
+		platformLoadGameCode(&gameCode);
+
 		int64_t frameStart = SDL_GetPerformanceCounter();
 		uint64_t startCyclesCount = _rdtsc();
 

@@ -119,6 +119,7 @@ struct GameState {
 	int toneHz;
 	int xOffset;
 	int yOffset;
+	real32 tsine;
 };
 
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
