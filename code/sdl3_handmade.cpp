@@ -32,8 +32,6 @@
 // TODO(bruno): check deadzone here
 // TODO(bruno): go back to episode 19 to improve audio and video sync
 
-GAME_UPDATE_AND_RENDER globalGameUpdateAndRender;
-
 struct PlatformBackbuffer {
 	int width;
 	int height;
@@ -47,6 +45,12 @@ struct PlatformAudioOutput {
 	SDL_AudioStream *stream;
 	int sampleRate;
 	int numChannels;
+};
+
+struct PlatformGameCode {
+	void *gameLib;
+	GAME_UPDATE_AND_RENDER gameUpdateAndRender;
+	bool loaded;
 };
 
 global_variable bool globalRunning;
@@ -472,6 +476,10 @@ bool platformInitializeGameMemory(GameMemory *gameMemory) {
 	gameMemory->transientStorage =
 		(void *)((uint8_t *)memory + gameMemory->permanentStorageSize);
 
+	gameMemory->DEBUGPlatformReadEntireFile = &DEBUGPlatformReadEntireFile;
+	gameMemory->DEBUGPlatformFreeFileMemory = &DEBUGPlatformFreeFileMemory;
+	gameMemory->DEBUGPlatformWriteEntireFile = &DEBUGPlatformWriteEntireFile;
+
 	return true;
 }
 
@@ -523,17 +531,33 @@ inline void platformDelayFrame(int64_t frameStart,
 	}
 }
 
-bool platformLoadGameCode() {
-	void *gameLib = dlopen("./target/handmade.so", RTLD_LAZY);
-	if (!gameLib)
+void platformUnloadGameCode(PlatformGameCode *platformGameCode) {
+	if (platformGameCode->loaded) {
+		dlclose(platformGameCode->gameLib);
+		platformGameCode->loaded = false;
+		platformGameCode->gameLib = NULL;
+		platformGameCode->gameUpdateAndRender = NULL;
+	}
+}
+
+bool platformLoadGameCode(PlatformGameCode *platformGameCode) {
+#ifndef GAME_LIB_PATH
+#define GAME_LIB_PATH "handmade.so"
+#endif
+	platformGameCode->gameLib = dlopen(GAME_LIB_PATH, RTLD_LAZY);
+	if (!platformGameCode->gameLib)
 		return false;
-	globalGameUpdateAndRender =
-		(GAME_UPDATE_AND_RENDER)dlsym(gameLib, "gameUpdateAndRender");
-	if (!globalGameUpdateAndRender) {
+
+	platformGameCode->gameUpdateAndRender = (GAME_UPDATE_AND_RENDER)dlsym(
+		platformGameCode->gameLib, "gameUpdateAndRender");
+
+	if (!platformGameCode->gameUpdateAndRender) {
 		printf("Failed to load gameUpdateAndRender: %s\n", dlerror());
-		dlclose(gameLib);
+		dlclose(platformGameCode->gameLib);
 		return false;
 	}
+
+	platformGameCode->loaded = true;
 
 	return true;
 }
@@ -541,11 +565,6 @@ bool platformLoadGameCode() {
 int main(void) {
 	int initialWidth = 1920 / 2;
 	int initialHeight = 1080 / 2;
-
-	if (!platformLoadGameCode()) {
-		// TODO(bruno): proper error handling
-		return -1;
-	}
 
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD |
 				  SDL_INIT_AUDIO))
@@ -568,8 +587,10 @@ int main(void) {
 	}
 
 	int refreshRate = platformGetDisplayRefreshRate(window);
-	int gameUpdateHz = 30; // TODO(bruno): make this dynamic
-	real32 targetSecondsPerFrame = 1.0f / (real32)gameUpdateHz;
+	real32 targetSecondsPerFrame =
+		1.0f / (real32)refreshRate; // TODO(bruno): change the game refresh rate
+									// based on the hardware capacity: if it's
+									// too slow, lower it to 30fps
 
 	GameMemory gameMemory = {};
 	if (!platformInitializeGameMemory(&gameMemory)) {
@@ -586,7 +607,12 @@ int main(void) {
 
 	int64_t lastFrameStart = SDL_GetPerformanceCounter();
 
+	PlatformGameCode gameCode = {};
+
 	while (globalRunning) {
+		platformUnloadGameCode(&gameCode);
+		platformLoadGameCode(&gameCode);
+
 		int64_t frameStart = SDL_GetPerformanceCounter();
 		uint64_t startCyclesCount = _rdtsc();
 
@@ -621,8 +647,8 @@ int main(void) {
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
 		}
-		globalGameUpdateAndRender(&gameMemory, &gamebackbuffer,
-								  &gameSoundBuffer, newInput);
+		gameCode.gameUpdateAndRender(&gameMemory, &gamebackbuffer,
+									 &gameSoundBuffer, newInput);
 		platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
 
 #if HANDMADE_INTERNAL
