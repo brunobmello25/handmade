@@ -463,6 +463,7 @@ int main(void) {
 		GameControllerInput *oldKeyboard = &oldInput->controllers[0];
 		GameControllerInput *newKeyboard = &newInput->controllers[0];
 		*newKeyboard = {};
+		newKeyboard->isConnected = true;
 		for (size_t i = 0; i < arraylength(newKeyboard->buttons); i++) {
 			newKeyboard->buttons[i].endedDown =
 				oldKeyboard->buttons[i].endedDown;
