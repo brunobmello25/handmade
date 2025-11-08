@@ -342,6 +342,8 @@ bool platformInitializeGameMemory(GameMemory *gameMemory) {
 
 void platformOutputSound(PlatformAudioOutput *audioOutput,
 						 GameSoundBuffer *gameSoundBuffer) {
+	if (!gameSoundBuffer->samples || gameSoundBuffer->sampleCount == 0)
+		return;
 	// Push audio data to the stream
 	int bytesPerSample = audioOutput->numChannels * sizeof(int16_t);
 	int bytesToWrite = gameSoundBuffer->sampleCount * bytesPerSample;
@@ -525,23 +527,19 @@ int main(void) {
 		gamebackbuffer.memory = globalBackbuffer.memory;
 
 		// Only generate audio if we're actually going to use it
+		GameSoundBuffer gameSoundBuffer = {};
+		int16_t samples[48000 * 2]; // TODO(bruno): 1 second max buffer.
 		if (platformShouldQueueAudioSamples()) {
-			GameSoundBuffer gameSoundBuffer = {};
-			int16_t samples[48000 * 2]; // TODO(bruno): 1 second max buffer.
-										// make this dynamic later
+			// make this dynamic later
 			gameSoundBuffer.sampleCount =
 				platformGetSamplesToGenerate(frameStart, lastFrameStart);
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
-
-			gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
-								newInput);
-			platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
-		} else {
-			GameSoundBuffer gameSoundBuffer = {};
-			gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
-								newInput);
 		}
+		gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
+							newInput);
+		platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
+
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
 
 		platformDelayFrame(frameStart, targetSecondsPerFrame);
