@@ -1,3 +1,4 @@
+#include <cstddef>
 #ifndef HANDMADE_H
 
 #include <stddef.h>
@@ -20,13 +21,6 @@
 
 #define global_variable static
 #define local_persist static
-
-inline u_int32_t safeTruncateUint64(u_int64_t value) {
-	assert(value <=
-		   0xFFFFFFFF); // TODO(bruno): defines for max values like u_int32_max
-	u_int32_t result = (u_int32_t)value;
-	return result;
-}
 
 typedef float real32;
 typedef double real64;
@@ -105,6 +99,18 @@ struct DEBUGReadFileResult {
 	size_t size;
 	void *data;
 };
+
+inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
+	assert(index >= 0 && index < arraylength(input->controllers));
+	return &input->controllers[index];
+}
+
+inline u_int32_t safeTruncateUint64(u_int64_t value) {
+	assert(value <=
+		   0xFFFFFFFF); // TODO(bruno): defines for max values like u_int32_max
+	u_int32_t result = (u_int32_t)value;
+	return result;
+}
 
 DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename);
 void DEBUGPlatformFreeFileMemory(void *memory);

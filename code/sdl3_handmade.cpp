@@ -73,9 +73,16 @@ void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
 }
 
-bool platformProcessEvents(PlatformBackbuffer *backbuffer) {
-	SDL_Event event;
+void platformProcessKeypress(GameButtonState *newState, bool isDown) {
+	assert(newState->endedDown != isDown);
+	newState->endedDown = isDown;
+	newState->halfTransitionCount++;
+}
 
+bool platformProcessEvents(PlatformBackbuffer *backbuffer,
+						   GameControllerInput *keyboardInput) {
+
+	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
 		if (event.type == SDL_EVENT_QUIT) {
 			return false;
@@ -86,14 +93,16 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer) {
 			if (event.key.key == SDLK_ESCAPE)
 				return false;
 
+			bool isDown = (event.type == SDL_EVENT_KEY_DOWN);
+
 			if (event.key.key == SDLK_W)
-				printf("w\n");
+				platformProcessKeypress(&keyboardInput->moveUp, isDown);
 			if (event.key.key == SDLK_A)
-				printf("a\n");
+				platformProcessKeypress(&keyboardInput->moveLeft, isDown);
 			if (event.key.key == SDLK_S)
-				printf("s\n");
+				platformProcessKeypress(&keyboardInput->moveDown, isDown);
 			if (event.key.key == SDLK_D)
-				printf("d\n");
+				platformProcessKeypress(&keyboardInput->moveRight, isDown);
 		}
 		if (event.type == SDL_EVENT_WINDOW_RESIZED) {
 			SDL_Window *window = SDL_GetWindowFromEvent(&event);
@@ -446,7 +455,19 @@ int main(void) {
 		int64_t frameStart = SDL_GetPerformanceCounter();
 		uint64_t startCyclesCount = _rdtsc();
 
-		globalRunning = platformProcessEvents(&globalBackbuffer);
+		platformProcessControllers(newInput);
+		GameInput *temp = oldInput;
+		oldInput = newInput;
+		newInput = temp;
+
+		GameControllerInput *oldKeyboard = &oldInput->controllers[0];
+		GameControllerInput *newKeyboard = &newInput->controllers[0];
+		*newKeyboard = {};
+		for (size_t i = 0; i < arraylength(newKeyboard->buttons); i++) {
+			newKeyboard->buttons[i].endedDown =
+				oldKeyboard->buttons[i].endedDown;
+		}
+		globalRunning = platformProcessEvents(&globalBackbuffer, newKeyboard);
 
 		GameBackbuffer gamebackbuffer = {};
 		gamebackbuffer.width = globalBackbuffer.width;
@@ -473,11 +494,6 @@ int main(void) {
 								newInput);
 		}
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
-
-		platformProcessControllers(newInput);
-		GameInput *temp = oldInput;
-		oldInput = newInput;
-		newInput = temp;
 
 		int64_t frameEnd = SDL_GetPerformanceCounter();
 		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
