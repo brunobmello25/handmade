@@ -531,34 +531,38 @@ inline void platformDelayFrame(int64_t frameStart,
 	}
 }
 
-PlatformGameCode platformLoadGameCode() {
-	PlatformGameCode platformGameCode = {};
-
-	void *gameLib = dlopen("./target/handmade.so", RTLD_LAZY);
-	if (!gameLib)
-		return platformGameCode;
-	platformGameCode.gameLib = gameLib;
-
-	platformGameCode.gameUpdateAndRender =
-		(GAME_UPDATE_AND_RENDER)dlsym(gameLib, "gameUpdateAndRender");
-
-	if (!platformGameCode.gameUpdateAndRender) {
-		printf("Failed to load gameUpdateAndRender: %s\n", dlerror());
-		dlclose(gameLib);
-		return platformGameCode;
+bool platformLoadGameCode(PlatformGameCode *platformGameCode) {
+	if (platformGameCode->loaded) {
+		dlclose(platformGameCode->gameLib);
+		platformGameCode->loaded = false;
+		platformGameCode->gameLib = NULL;
+		platformGameCode->gameUpdateAndRender = NULL;
 	}
 
-	platformGameCode.loaded = true;
+	platformGameCode->gameLib = dlopen("./target/handmade.so", RTLD_LAZY);
+	if (!platformGameCode->gameLib)
+		return false;
 
-	return platformGameCode;
+	platformGameCode->gameUpdateAndRender = (GAME_UPDATE_AND_RENDER)dlsym(
+		platformGameCode->gameLib, "gameUpdateAndRender");
+
+	if (!platformGameCode->gameUpdateAndRender) {
+		printf("Failed to load gameUpdateAndRender: %s\n", dlerror());
+		dlclose(platformGameCode->gameLib);
+		return false;
+	}
+
+	platformGameCode->loaded = true;
+
+	return true;
 }
 
 int main(void) {
 	int initialWidth = 1920 / 2;
 	int initialHeight = 1080 / 2;
 
-	PlatformGameCode gameCode = platformLoadGameCode();
-	if (!gameCode.loaded) {
+	PlatformGameCode gameCode = {};
+	if (!platformLoadGameCode(&gameCode)) {
 		// TODO(bruno): proper error handling
 		return -1;
 	}
