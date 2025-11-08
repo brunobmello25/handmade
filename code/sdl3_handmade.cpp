@@ -30,6 +30,7 @@
 #include <x86intrin.h>
 
 // TODO(bruno): check deadzone here
+// TODO(bruno): go back to episode 19 to improve audio and video sync
 
 struct PlatformBackbuffer {
 	int width;
@@ -125,6 +126,138 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 	}
 	return true;
 }
+
+#if HANDMADE_INTERNAL
+void DEBUGplatformDrawDebugAudioLine(PlatformBackbuffer *buffer, int x, int top,
+									 int bottom, uint32_t color) {
+	if (x < 0 || x >= buffer->width)
+		return;
+
+	uint32_t *pixel = (uint32_t *)buffer->memory;
+	for (int y = top; y < bottom && y < buffer->height; y++) {
+		pixel[y * buffer->width + x] = color;
+	}
+}
+
+void DEBUGPlatformDrawDebugAudio(GameSoundBuffer *gameSoundBuffer) {
+	// Draw debug audio visualization
+	// Shows audio buffer state before we update the window
+	int debugQueued = SDL_GetAudioStreamQueued(globalAudioOutput.stream);
+	int debugQueuedSamples =
+		debugQueued / (globalAudioOutput.numChannels * sizeof(int16_t));
+	int targetQueuedSamples = (globalAudioOutput.sampleRate / 30) * 2;
+
+	// Draw a visual representation at the top of the screen
+	// White line = current frame position
+	// Green area = queued audio
+	// Red line = target queue level
+	// Yellow area = audio we just generated this frame
+
+	int debugHeight = 20;
+	int debugTop = 10;
+
+	// Scale: 1 pixel = (sampleRate / width) samples
+	real32 samplesPerPixel =
+		(real32)(globalAudioOutput.sampleRate) / (real32)globalBackbuffer.width;
+
+	// Draw current queued level (green)
+	int queuedPixels = (int)((real32)debugQueuedSamples / samplesPerPixel);
+	for (int x = 0; x < queuedPixels && x < globalBackbuffer.width; x++) {
+		DEBUGplatformDrawDebugAudioLine(&globalBackbuffer, x, debugTop,
+										debugTop + debugHeight, 0xFF00FF00);
+	}
+
+	// Draw target queue level (red vertical line)
+	int targetPixels = (int)((real32)targetQueuedSamples / samplesPerPixel);
+	DEBUGplatformDrawDebugAudioLine(&globalBackbuffer, targetPixels, debugTop,
+									debugTop + debugHeight + 5, 0xFFFF0000);
+
+	// Draw current frame's audio generation (yellow, on top of green)
+	if (gameSoundBuffer->sampleCount > 0) {
+		int generatedPixels =
+			(int)((real32)gameSoundBuffer->sampleCount / samplesPerPixel);
+		for (int x = queuedPixels - generatedPixels;
+			 x < queuedPixels && x >= 0 && x < globalBackbuffer.width; x++) {
+			DEBUGplatformDrawDebugAudioLine(&globalBackbuffer, x, debugTop,
+											debugTop + debugHeight, 0xFFFFFF00);
+		}
+	}
+
+	// Draw frame marker (white vertical line at beginning)
+	DEBUGplatformDrawDebugAudioLine(&globalBackbuffer, 0, debugTop - 5,
+									debugTop + debugHeight + 5, 0xFFFFFFFF);
+}
+
+DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename) {
+	DEBUGReadFileResult result = {};
+	int handle = open(filename, O_RDONLY);
+	if (handle == -1) {
+		return result;
+	}
+
+	struct stat status;
+	if (fstat(handle, &status) == -1) {
+		close(handle);
+		return result;
+	}
+
+	result.size = safeTruncateUint64(status.st_size);
+
+	result.data = malloc(result.size);
+	if (!result.data) {
+		close(handle);
+		result.size = 0;
+		return result;
+	}
+
+	ssize_t bytesToRead = result.size;
+	u_int8_t *nextByteLocation = (u_int8_t *)result.data;
+	while (bytesToRead) {
+		ssize_t bytesRead = read(handle, nextByteLocation, bytesToRead);
+		if (bytesRead == -1) {
+			free(result.data);
+			result.data = 0;
+			result.size = 0;
+			close(handle);
+			return result;
+		}
+
+		bytesToRead -= bytesRead;
+		nextByteLocation += bytesRead;
+	}
+
+	close(handle);
+	return result;
+}
+
+void DEBUGPlatformFreeFileMemory(void *memory) { free(memory); }
+
+bool DEBUGPlatformWriteEntireFile(const char *filename, u_int32_t size,
+								  void *memory) {
+	int handle = open(filename, O_WRONLY | O_CREAT,
+					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+	if (handle == -1) {
+		return false;
+	}
+
+	ssize_t bytesToWrite = size;
+	u_int8_t *nextByteLocation = (u_int8_t *)memory;
+	while (bytesToWrite) {
+		ssize_t bytesWritten = write(handle, nextByteLocation, bytesToWrite);
+		if (bytesWritten == -1) {
+			close(handle);
+			return false;
+		}
+
+		bytesToWrite -= bytesWritten;
+		nextByteLocation += bytesWritten;
+	}
+
+	close(handle);
+	return true;
+}
+#endif
 
 void platformUpdateWindow(PlatformBackbuffer *buffer, SDL_Window *window,
 						  SDL_Renderer *renderer) {
@@ -351,76 +484,6 @@ void platformOutputSound(PlatformAudioOutput *audioOutput,
 						   bytesToWrite);
 }
 
-DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename) {
-	DEBUGReadFileResult result = {};
-	int handle = open(filename, O_RDONLY);
-	if (handle == -1) {
-		return result;
-	}
-
-	struct stat status;
-	if (fstat(handle, &status) == -1) {
-		close(handle);
-		return result;
-	}
-
-	result.size = safeTruncateUint64(status.st_size);
-
-	result.data = malloc(result.size);
-	if (!result.data) {
-		close(handle);
-		result.size = 0;
-		return result;
-	}
-
-	ssize_t bytesToRead = result.size;
-	u_int8_t *nextByteLocation = (u_int8_t *)result.data;
-	while (bytesToRead) {
-		ssize_t bytesRead = read(handle, nextByteLocation, bytesToRead);
-		if (bytesRead == -1) {
-			free(result.data);
-			result.data = 0;
-			result.size = 0;
-			close(handle);
-			return result;
-		}
-
-		bytesToRead -= bytesRead;
-		nextByteLocation += bytesRead;
-	}
-
-	close(handle);
-	return result;
-}
-
-void DEBUGPlatformFreeFileMemory(void *memory) { free(memory); }
-
-bool DEBUGPlatformWriteEntireFile(const char *filename, u_int32_t size,
-								  void *memory) {
-	int handle = open(filename, O_WRONLY | O_CREAT,
-					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-
-	if (handle == -1) {
-		return false;
-	}
-
-	ssize_t bytesToWrite = size;
-	u_int8_t *nextByteLocation = (u_int8_t *)memory;
-	while (bytesToWrite) {
-		ssize_t bytesWritten = write(handle, nextByteLocation, bytesToWrite);
-		if (bytesWritten == -1) {
-			close(handle);
-			return false;
-		}
-
-		bytesToWrite -= bytesWritten;
-		nextByteLocation += bytesWritten;
-	}
-
-	close(handle);
-	return true;
-}
-
 int platformGetDisplayRefreshRate(SDL_Window *window) {
 	int defaultRefreshRate = 60;
 
@@ -539,6 +602,10 @@ int main(void) {
 		gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
 							newInput);
 		platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
+
+#if HANDMADE_INTERNAL
+		DEBUGPlatformDrawDebugAudio(&gameSoundBuffer);
+#endif
 
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
 
