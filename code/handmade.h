@@ -1,13 +1,16 @@
-#include <sys/types.h>
+#include <cstddef>
 #ifndef HANDMADE_H
 
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 #define assert(expression)                                                     \
 	if (!(expression)) {                                                       \
 		*(int *)0 = 0;                                                         \
 	}
+
+#define arraylength(array) (sizeof(array) / sizeof((array)[0]))
 
 #define Kilobytes(x) ((x) * (size_t)1024)
 #define Megabytes(x) (Kilobytes(x) * (size_t)1024)
@@ -18,13 +21,6 @@
 
 #define global_variable static
 #define local_persist static
-
-inline u_int32_t safeTruncateUint64(u_int64_t value) {
-	assert(value <=
-		   0xFFFFFFFF); // TODO(bruno): defines for max values like u_int32_max
-	u_int32_t result = (u_int32_t)value;
-	return result;
-}
 
 typedef float real32;
 typedef double real64;
@@ -60,34 +56,38 @@ struct GameButtonState {
 struct GameControllerInput {
 
 	bool isAnalog;
+	bool isConnected;
 
-	real32 startX;
-	real32 startY;
-
-	real32 endX;
-	real32 endY;
-
-	real32 minX;
-	real32 minY;
-
-	real32 maxX;
-	real32 maxY;
+	real32 stickAverageX;
+	real32 stickAverageY;
 
 	union {
-		GameButtonState buttons[6];
-		struct {
-			GameButtonState up;
-			GameButtonState down;
-			GameButtonState left;
-			GameButtonState right;
+		GameButtonState buttons[12];
+		struct { // TODO(bruno): maybe deanon this struct so that we can assert
+				 // that the size of buttons matches the size of the struct, at
+				 // the cost of having to access stuff like
+				 // controller.button.moveUp instead of controller.moveUp
+			GameButtonState moveUp;
+			GameButtonState moveDown;
+			GameButtonState moveLeft;
+			GameButtonState moveRight;
+
+			GameButtonState actionUp;
+			GameButtonState actionDown;
+			GameButtonState actionLeft;
+			GameButtonState actionRight;
+
 			GameButtonState leftShoulder;
 			GameButtonState rightShoulder;
+
+			GameButtonState back;
+			GameButtonState start;
 		};
 	};
 };
 
 struct GameInput {
-	GameControllerInput controllers[4];
+	GameControllerInput controllers[MAX_CONTROLLERS + 1];
 };
 
 struct GameState {
@@ -102,6 +102,25 @@ struct DEBUGReadFileResult {
 	size_t size;
 	void *data;
 };
+
+inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
+	assert(index >= 0 && index < arraylength(input->controllers));
+
+	GameControllerInput *controller = &input->controllers[index];
+
+	// TODO(bruno): better assert here
+	assert(&controller->start - &controller->buttons[0] ==
+		   arraylength(controller->buttons) - 1);
+
+	return controller;
+}
+
+inline u_int32_t safeTruncateUint64(u_int64_t value) {
+	assert(value <=
+		   0xFFFFFFFF); // TODO(bruno): defines for max values like u_int32_max
+	u_int32_t result = (u_int32_t)value;
+	return result;
+}
 
 DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename);
 void DEBUGPlatformFreeFileMemory(void *memory);

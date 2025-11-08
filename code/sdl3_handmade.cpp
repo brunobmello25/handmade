@@ -29,6 +29,8 @@
 #include <unistd.h>
 #include <x86intrin.h>
 
+// TODO(bruno): check deadzone here
+
 struct PlatformBackbuffer {
 	int width;
 	int height;
@@ -73,9 +75,16 @@ void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
 }
 
-bool platformProcessEvents(PlatformBackbuffer *backbuffer) {
-	SDL_Event event;
+void platformProcessKeypress(GameButtonState *newState, bool isDown) {
+	assert(newState->endedDown != isDown);
+	newState->endedDown = isDown;
+	newState->halfTransitionCount++;
+}
 
+bool platformProcessEvents(PlatformBackbuffer *backbuffer,
+						   GameControllerInput *keyboardInput) {
+
+	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
 		if (event.type == SDL_EVENT_QUIT) {
 			return false;
@@ -86,14 +95,19 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer) {
 			if (event.key.key == SDLK_ESCAPE)
 				return false;
 
+			if (event.key.repeat)
+				continue;
+
+			bool isDown = (event.type == SDL_EVENT_KEY_DOWN);
+
 			if (event.key.key == SDLK_W)
-				printf("w\n");
+				platformProcessKeypress(&keyboardInput->moveUp, isDown);
 			if (event.key.key == SDLK_A)
-				printf("a\n");
+				platformProcessKeypress(&keyboardInput->moveLeft, isDown);
 			if (event.key.key == SDLK_S)
-				printf("s\n");
+				platformProcessKeypress(&keyboardInput->moveDown, isDown);
 			if (event.key.key == SDLK_D)
-				printf("d\n");
+				platformProcessKeypress(&keyboardInput->moveRight, isDown);
 		}
 		if (event.type == SDL_EVENT_WINDOW_RESIZED) {
 			SDL_Window *window = SDL_GetWindowFromEvent(&event);
@@ -183,10 +197,9 @@ void platformInitializeSound(PlatformAudioOutput *audioOutput) {
 }
 
 void processControllerButton(GameButtonState *oldState,
-							 GameButtonState *newState, SDL_Gamepad *pad,
-							 SDL_GamepadButton button) {
-	newState->endedDown = SDL_GetGamepadButton(pad, button);
-	newState->halfTransitionCount =
+							 GameButtonState *newState, bool value) {
+	newState->endedDown = value;
+	newState->halfTransitionCount +=
 		(oldState->endedDown != newState->endedDown) ? 1 : 0;
 }
 
@@ -195,14 +208,33 @@ void platformProcessControllers(GameInput *gameInput) {
 	// TODO(bruno): handle this loop when we have more controllers on sdl than
 	// on game
 	for (int i = 0; i < MAX_CONTROLLERS; i++) {
-		GameControllerInput *oldController = &gameInput->controllers[0];
-		GameControllerInput *newController = &gameInput->controllers[0];
+		GameControllerInput *oldController = &gameInput->controllers[i + 1];
+		GameControllerInput *newController = &gameInput->controllers[i + 1];
 
 		SDL_Gamepad *pad = GamepadHandles[i];
-		if (!pad)
+		if (!pad) {
+			newController->isConnected = false;
 			continue;
+		}
 
-		// TODO: dpad
+		newController->isConnected = true;
+
+		// Process D-pad buttons
+		bool dpadUp = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_UP);
+		bool dpadDown = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+		bool dpadLeft = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
+		bool dpadRight =
+			SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+
+		processControllerButton(&oldController->moveUp, &newController->moveUp,
+								dpadUp);
+		processControllerButton(&oldController->moveDown,
+								&newController->moveDown, dpadDown);
+		processControllerButton(&oldController->moveLeft,
+								&newController->moveLeft, dpadLeft);
+		processControllerButton(&oldController->moveRight,
+								&newController->moveRight, dpadRight);
+
 		int16_t sdlStickX = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
 		int16_t sdlStickY = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY);
 		real32 stickX;
@@ -218,23 +250,31 @@ void platformProcessControllers(GameInput *gameInput) {
 			stickY = (real32)sdlStickY / 32767.0f;
 		}
 
-		newController->isAnalog = true;
-		newController->startX = oldController->endX;
-		newController->startY = oldController->endY;
-		// TODO(bruno): min/max macros
-		newController->minX = newController->maxX = newController->endX =
-			stickX;
-		newController->minY = newController->maxY = newController->endY =
-			stickY;
+		newController->stickAverageX = stickX;
+		newController->stickAverageY = stickY;
 
-		processControllerButton(&oldController->down, &newController->down, pad,
-								SDL_GAMEPAD_BUTTON_SOUTH);
-		processControllerButton(&oldController->up, &newController->up, pad,
-								SDL_GAMEPAD_BUTTON_NORTH);
-		processControllerButton(&oldController->left, &newController->left, pad,
-								SDL_GAMEPAD_BUTTON_WEST);
-		processControllerButton(&oldController->right, &newController->right,
-								pad, SDL_GAMEPAD_BUTTON_EAST);
+		// Set isAnalog based on stick movement and dpad state
+		// If any dpad button is pressed, set to false (digital input)
+		// Otherwise, set based on whether stick is being used
+		bool dpadPressed = dpadUp || dpadDown || dpadLeft || dpadRight;
+		if (dpadPressed) {
+			newController->isAnalog = false;
+		} else {
+			newController->isAnalog = (stickX != 0.0f || stickY != 0.0f);
+		}
+
+		processControllerButton(
+			&oldController->actionDown, &newController->actionDown,
+			SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_SOUTH));
+		processControllerButton(
+			&oldController->actionRight, &newController->actionRight,
+			SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_EAST));
+		processControllerButton(
+			&oldController->actionLeft, &newController->actionLeft,
+			SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_WEST));
+		processControllerButton(
+			&oldController->actionUp, &newController->actionUp,
+			SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_NORTH));
 
 		// TODO(bruno): rumble
 	}
@@ -389,6 +429,8 @@ int main(void) {
 
 	platformLoadControllers();
 	GameInput gameInputs[2];
+	gameInputs[0] = {};
+	gameInputs[1] = {};
 	GameInput *newInput = &gameInputs[0];
 	GameInput *oldInput = &gameInputs[1];
 
@@ -418,7 +460,20 @@ int main(void) {
 		int64_t frameStart = SDL_GetPerformanceCounter();
 		uint64_t startCyclesCount = _rdtsc();
 
-		globalRunning = platformProcessEvents(&globalBackbuffer);
+		platformProcessControllers(newInput);
+		GameInput *temp = oldInput;
+		oldInput = newInput;
+		newInput = temp;
+
+		GameControllerInput *oldKeyboard = &oldInput->controllers[0];
+		GameControllerInput *newKeyboard = &newInput->controllers[0];
+		*newKeyboard = {};
+		newKeyboard->isConnected = true;
+		for (size_t i = 0; i < arraylength(newKeyboard->buttons); i++) {
+			newKeyboard->buttons[i].endedDown =
+				oldKeyboard->buttons[i].endedDown;
+		}
+		globalRunning = platformProcessEvents(&globalBackbuffer, newKeyboard);
 
 		GameBackbuffer gamebackbuffer = {};
 		gamebackbuffer.width = globalBackbuffer.width;
@@ -446,11 +501,6 @@ int main(void) {
 		}
 		platformUpdateWindow(&globalBackbuffer, window, renderer);
 
-		platformProcessControllers(newInput);
-		GameInput *temp = oldInput;
-		oldInput = newInput;
-		newInput = temp;
-
 		int64_t frameEnd = SDL_GetPerformanceCounter();
 		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
 		int64_t frameDuration = frameEnd - frameStart;
@@ -470,9 +520,11 @@ int main(void) {
 		u_int64_t endCyclesCount = _rdtsc();
 		u_int64_t cyclesElapsed = endCyclesCount - startCyclesCount;
 
+#if HANDMADE_PRINTDEBUG
 		printf("ms/frame: %.02f  fps: %.02f  MegaCycles/frame: %lu  Audio "
 			   "queued: %.3fs\n",
 			   msPerFrame, fps, cyclesElapsed / (1000 * 1000), queuedSeconds);
+#endif
 	}
 
 	// TODO(bruno): we are not freeing sdl renderer, sdl window and backbuffer

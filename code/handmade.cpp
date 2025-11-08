@@ -62,25 +62,24 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 		gameMemory->isInitialized = true;
 	}
 
-	GameControllerInput *input0 = &input->controllers[0];
-	if (input0->isAnalog) {
-		gameState->xOffset += (int)(4.0f * input0->endX);
-		gameState->yOffset += (int)(4.0f * input0->endY);
-		gameState->toneHz = 256 + (int)(256.0f * (input0->endY / 8.0f));
-	} else {
-	}
+	for (size_t i = 0; i < arraylength(input->controllers); i++) {
+		GameControllerInput *controller = gameGetController(input, i);
 
-	if (input0->down.endedDown) {
-		gameState->yOffset += 1;
-	}
-	if (input0->up.endedDown) {
-		gameState->yOffset -= 1;
-	}
-	if (input0->left.endedDown) {
-		gameState->xOffset -= 1;
-	}
-	if (input0->right.endedDown) {
-		gameState->xOffset += 1;
+		if (controller->isAnalog) {
+			gameState->xOffset += (int)(4.0f * controller->stickAverageX);
+			gameState->yOffset += (int)(4.0f * controller->stickAverageY);
+			gameState->toneHz =
+				256 + (int)(256.0f * (controller->stickAverageY / 8.0f));
+		} else {
+			if (controller->moveUp.endedDown)
+				gameState->yOffset -= 4;
+			if (controller->moveDown.endedDown)
+				gameState->yOffset += 4;
+			if (controller->moveLeft.endedDown)
+				gameState->xOffset -= 4;
+			if (controller->moveRight.endedDown)
+				gameState->xOffset += 4;
+		}
 	}
 
 	gameOutputSound(soundBuffer,
