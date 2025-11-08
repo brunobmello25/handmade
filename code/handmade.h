@@ -96,13 +96,6 @@ struct GameState {
 	int yOffset;
 };
 
-//  NOTE(bruno): services that the platform layer provides to the game
-#if HANDMADE_INTERNAL
-struct DEBUGReadFileResult {
-	size_t size;
-	void *data;
-};
-
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
 	assert(index >= 0 && index < arraylength(input->controllers));
 
@@ -121,6 +114,13 @@ inline u_int32_t safeTruncateUint64(u_int64_t value) {
 	u_int32_t result = (u_int32_t)value;
 	return result;
 }
+
+//  NOTE(bruno): services that the platform layer provides to the game
+#if HANDMADE_INTERNAL
+struct DEBUGReadFileResult {
+	size_t size;
+	void *data;
+};
 
 DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename);
 void DEBUGPlatformFreeFileMemory(void *memory);
