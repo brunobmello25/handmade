@@ -32,8 +32,6 @@
 // TODO(bruno): check deadzone here
 // TODO(bruno): go back to episode 19 to improve audio and video sync
 
-GAME_UPDATE_AND_RENDER globalGameUpdateAndRender;
-
 struct PlatformBackbuffer {
 	int width;
 	int height;
@@ -47,6 +45,12 @@ struct PlatformAudioOutput {
 	SDL_AudioStream *stream;
 	int sampleRate;
 	int numChannels;
+};
+
+struct PlatformGameCode {
+	void *gameLib;
+	GAME_UPDATE_AND_RENDER gameUpdateAndRender;
+	bool loaded;
 };
 
 global_variable bool globalRunning;
@@ -523,26 +527,34 @@ inline void platformDelayFrame(int64_t frameStart,
 	}
 }
 
-bool platformLoadGameCode() {
+PlatformGameCode platformLoadGameCode() {
+	PlatformGameCode platformGameCode = {};
+
 	void *gameLib = dlopen("./target/handmade.so", RTLD_LAZY);
 	if (!gameLib)
-		return false;
-	globalGameUpdateAndRender =
+		return platformGameCode;
+	platformGameCode.gameLib = gameLib;
+
+	platformGameCode.gameUpdateAndRender =
 		(GAME_UPDATE_AND_RENDER)dlsym(gameLib, "gameUpdateAndRender");
-	if (!globalGameUpdateAndRender) {
+
+	if (!platformGameCode.gameUpdateAndRender) {
 		printf("Failed to load gameUpdateAndRender: %s\n", dlerror());
 		dlclose(gameLib);
-		return false;
+		return platformGameCode;
 	}
 
-	return true;
+	platformGameCode.loaded = true;
+
+	return platformGameCode;
 }
 
 int main(void) {
 	int initialWidth = 1920 / 2;
 	int initialHeight = 1080 / 2;
 
-	if (!platformLoadGameCode()) {
+	PlatformGameCode gameCode = platformLoadGameCode();
+	if (!gameCode.loaded) {
 		// TODO(bruno): proper error handling
 		return -1;
 	}
@@ -621,8 +633,8 @@ int main(void) {
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
 		}
-		globalGameUpdateAndRender(&gameMemory, &gamebackbuffer,
-								  &gameSoundBuffer, newInput);
+		gameCode.gameUpdateAndRender(&gameMemory, &gamebackbuffer,
+									 &gameSoundBuffer, newInput);
 		platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
 
 #if HANDMADE_INTERNAL

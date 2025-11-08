@@ -116,6 +116,8 @@ inline u_int32_t safeTruncateUint64(u_int64_t value) {
 	return result;
 }
 
+// TODO(bruno): work with stubs so that platform can still boot if no game code
+// is found
 typedef void (*GAME_UPDATE_AND_RENDER)(GameMemory *, GameBackbuffer *,
 									   GameSoundBuffer *, GameInput *);
 
