@@ -29,6 +29,8 @@
 #include <unistd.h>
 #include <x86intrin.h>
 
+// TODO(bruno): check deadzone here
+
 struct PlatformBackbuffer {
 	int width;
 	int height;
