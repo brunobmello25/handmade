@@ -33,7 +33,7 @@ echo "Building for platform: $PLATFORM (${ARCH}-bit)"
 mkdir -p ./target
 pushd ./target/
 
-COMMON_FLAGS="-DHANDMADE_PRINTDEBUG=0 -DHANDMADE_SLOW=1 -DHANDMADE_INTERNAL=0 -g -Wall -Wno-unused-variable -Wno-write-strings -Werror -fno-rtti -fno-exceptions"
+COMMON_FLAGS="-DHANDMADE_PRINTDEBUG=0 -DHANDMADE_SLOW=1 -DHANDMADE_INTERNAL=1 -g -Wall -Wno-unused-variable -Wno-write-strings -Werror -fno-rtti -fno-exceptions"
 
 # Set architecture-specific flags
 if [[ "$ARCH" == "32" ]]; then

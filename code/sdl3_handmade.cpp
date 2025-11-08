@@ -476,6 +476,10 @@ bool platformInitializeGameMemory(GameMemory *gameMemory) {
 	gameMemory->transientStorage =
 		(void *)((uint8_t *)memory + gameMemory->permanentStorageSize);
 
+	gameMemory->DEBUGPlatformReadEntireFile = &DEBUGPlatformReadEntireFile;
+	gameMemory->DEBUGPlatformFreeFileMemory = &DEBUGPlatformFreeFileMemory;
+	gameMemory->DEBUGPlatformWriteEntireFile = &DEBUGPlatformWriteEntireFile;
+
 	return true;
 }
 

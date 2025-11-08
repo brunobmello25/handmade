@@ -22,6 +22,26 @@
 #define global_variable static
 #define local_persist static
 
+//  NOTE(bruno): services that the platform layer provides to the game layer
+//  -----------------------------------------------------------------
+//  -----------------------------------------------------------------
+
+#if HANDMADE_INTERNAL
+struct DEBUGReadFileResult {
+	size_t size;
+	void *data;
+};
+
+typedef DEBUGReadFileResult (*DEBUGPlatformReadEntireFileFunc)(const char *);
+typedef void (*DEBUGPlatformFreeFileMemoryFunc)(void *);
+typedef bool (*DEBUGPlatformWriteEntireFileFunc)(const char *, u_int32_t,
+												 void *);
+#endif
+
+//  NOTE(bruno): services that the game layer provides to the platform layer
+//  -----------------------------------------------------------------
+//  -----------------------------------------------------------------
+
 // TODO(bruno): define type aliases like uint64 and int64
 typedef float real32;
 typedef double real64;
@@ -34,6 +54,10 @@ struct GameMemory {
 	void *transientStorage;
 
 	bool isInitialized;
+
+	DEBUGPlatformReadEntireFileFunc DEBUGPlatformReadEntireFile;
+	DEBUGPlatformFreeFileMemoryFunc DEBUGPlatformFreeFileMemory;
+	DEBUGPlatformWriteEntireFileFunc DEBUGPlatformWriteEntireFile;
 };
 
 struct GameBackbuffer {
@@ -125,22 +149,6 @@ extern "C" {
 void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 						 GameSoundBuffer *soundBuffer, GameInput *input);
 }
-
-//  NOTE(bruno): services that the platform layer provides to the game
-//  -----------------------------------------------------------------
-//  -----------------------------------------------------------------
-
-#if HANDMADE_INTERNAL
-struct DEBUGReadFileResult {
-	size_t size;
-	void *data;
-};
-
-DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename);
-void DEBUGPlatformFreeFileMemory(void *memory);
-bool DEBUGPlatformWriteEntireFile(const char *filename, u_int32_t size,
-								  void *memory);
-#endif
 
 #define HANDMADE_H
 #endif // HANDMADE_H
