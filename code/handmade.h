@@ -63,7 +63,10 @@ struct GameControllerInput {
 
 	union {
 		GameButtonState buttons[12];
-		struct {
+		struct { // TODO(bruno): maybe deanon this struct so that we can assert
+				 // that the size of buttons matches the size of the struct, at
+				 // the cost of having to access stuff like
+				 // controller.button.moveUp instead of controller.moveUp
 			GameButtonState moveUp;
 			GameButtonState moveDown;
 			GameButtonState moveLeft;
