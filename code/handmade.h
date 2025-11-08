@@ -102,7 +102,14 @@ struct DEBUGReadFileResult {
 
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
 	assert(index >= 0 && index < arraylength(input->controllers));
-	return &input->controllers[index];
+
+	GameControllerInput *controller = &input->controllers[index];
+
+	// TODO(bruno): better assert here
+	assert(&controller->start - &controller->buttons[0] ==
+		   arraylength(controller->buttons) - 1);
+
+	return controller;
 }
 
 inline u_int32_t safeTruncateUint64(u_int64_t value) {
