@@ -116,6 +116,9 @@ inline u_int32_t safeTruncateUint64(u_int64_t value) {
 }
 
 //  NOTE(bruno): services that the platform layer provides to the game
+//  -----------------------------------------------------------------
+//  -----------------------------------------------------------------
+
 #if HANDMADE_INTERNAL
 struct DEBUGReadFileResult {
 	size_t size;
