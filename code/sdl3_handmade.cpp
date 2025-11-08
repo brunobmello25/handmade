@@ -444,21 +444,14 @@ real32 platformGetSecondsElapsed(int64_t oldCounter, int64_t currentCounter) {
 inline void platformDelayFrame(int64_t frameStart,
 							   real32 targetSecondsPerFrame) {
 
-	if (platformGetSecondsElapsed(frameStart, SDL_GetPerformanceCounter()) <
-		targetSecondsPerFrame) {
-		u_int32_t TimeToSleep =
-			((targetSecondsPerFrame -
-			  platformGetSecondsElapsed(frameStart,
-										SDL_GetPerformanceCounter())) *
-			 1000) -
-			1;
-		SDL_Delay(TimeToSleep);
-		assert(
-			platformGetSecondsElapsed(frameStart, SDL_GetPerformanceCounter()) <
-			targetSecondsPerFrame) while (platformGetSecondsElapsed(frameStart,
-																	SDL_GetPerformanceCounter()) <
-										  targetSecondsPerFrame) {
-			// waiting
+	real32 secondsElapsed =
+		platformGetSecondsElapsed(frameStart, SDL_GetPerformanceCounter());
+
+	if (secondsElapsed < targetSecondsPerFrame) {
+		u_int32_t msToSleep =
+			(u_int32_t)((targetSecondsPerFrame - secondsElapsed) * 1000.0f);
+		if (msToSleep > 0) {
+			SDL_Delay(msToSleep);
 		}
 	}
 }
