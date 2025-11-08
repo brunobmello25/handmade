@@ -69,19 +69,15 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 		gameState->yOffset += (int)(4.0f * input0->stickAverageY);
 		gameState->toneHz =
 			256 + (int)(256.0f * (input0->stickAverageY / 8.0f));
-	}
-
-	if (input0->moveDown.endedDown) {
-		gameState->yOffset += 1;
-	}
-	if (input0->moveUp.endedDown) {
-		gameState->yOffset -= 1;
-	}
-	if (input0->moveLeft.endedDown) {
-		gameState->xOffset -= 1;
-	}
-	if (input0->moveRight.endedDown) {
-		gameState->xOffset += 1;
+	} else {
+		if (input0->moveUp.endedDown)
+			gameState->yOffset -= 4;
+		if (input0->moveDown.endedDown)
+			gameState->yOffset += 4;
+		if (input0->moveLeft.endedDown)
+			gameState->xOffset -= 4;
+		if (input0->moveRight.endedDown)
+			gameState->xOffset += 4;
 	}
 
 	gameOutputSound(soundBuffer,

@@ -206,7 +206,18 @@ void platformProcessControllers(GameInput *gameInput) {
 
 		newController->isConnected = true;
 
-		// TODO: dpad
+		// Process D-pad buttons
+		bool dpadUp = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_UP);
+		bool dpadDown = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+		bool dpadLeft = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
+		bool dpadRight = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+
+		processControllerButton(&oldController->moveUp, &newController->moveUp, dpadUp);
+		processControllerButton(&oldController->moveDown, &newController->moveDown, dpadDown);
+		processControllerButton(&oldController->moveLeft, &newController->moveLeft, dpadLeft);
+		processControllerButton(&oldController->moveRight, &newController->moveRight, dpadRight);
+
+
 		int16_t sdlStickX = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
 		int16_t sdlStickY = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY);
 		real32 stickX;
@@ -225,9 +236,15 @@ void platformProcessControllers(GameInput *gameInput) {
 		newController->stickAverageX = stickX;
 		newController->stickAverageY = stickY;
 
-		// Set isAnalog to true if either stick axis is non-zero, false
-		// otherwise
-		newController->isAnalog = (stickX != 0.0f || stickY != 0.0f);
+		// Set isAnalog based on stick movement and dpad state
+		// If any dpad button is pressed, set to false (digital input)
+		// Otherwise, set based on whether stick is being used
+		bool dpadPressed = dpadUp || dpadDown || dpadLeft || dpadRight;
+		if (dpadPressed) {
+			newController->isAnalog = false;
+		} else {
+			newController->isAnalog = (stickX != 0.0f || stickY != 0.0f);
+		}
 
 		processControllerButton(
 			&oldController->actionDown, &newController->actionDown,
