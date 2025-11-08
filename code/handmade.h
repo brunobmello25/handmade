@@ -22,6 +22,7 @@
 #define global_variable static
 #define local_persist static
 
+// TODO(bruno): define type aliases like uint64 and int64
 typedef float real32;
 typedef double real64;
 
