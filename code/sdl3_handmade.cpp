@@ -20,6 +20,7 @@
 #include "handmade.h"
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_gamepad.h>
 #include <cstddef>
 #include <fcntl.h>
 #include <stdio.h>
@@ -183,10 +184,9 @@ void platformInitializeSound(PlatformAudioOutput *audioOutput) {
 }
 
 void processControllerButton(GameButtonState *oldState,
-							 GameButtonState *newState, SDL_Gamepad *pad,
-							 SDL_GamepadButton button) {
-	newState->endedDown = SDL_GetGamepadButton(pad, button);
-	newState->halfTransitionCount =
+							 GameButtonState *newState, bool value) {
+	newState->endedDown = value;
+	newState->halfTransitionCount +=
 		(oldState->endedDown != newState->endedDown) ? 1 : 0;
 }
 
@@ -199,8 +199,12 @@ void platformProcessControllers(GameInput *gameInput) {
 		GameControllerInput *newController = &gameInput->controllers[i + 1];
 
 		SDL_Gamepad *pad = GamepadHandles[i];
-		if (!pad)
+		if (!pad) {
+			newController->isConnected = false;
 			continue;
+		}
+
+		newController->isConnected = true;
 
 		// TODO: dpad
 		int16_t sdlStickX = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
@@ -218,23 +222,25 @@ void platformProcessControllers(GameInput *gameInput) {
 			stickY = (real32)sdlStickY / 32767.0f;
 		}
 
-		newController->isAnalog = true;
-		newController->startX = oldController->endX;
-		newController->startY = oldController->endY;
-		// TODO(bruno): min/max macros
-		newController->minX = newController->maxX = newController->endX =
-			stickX;
-		newController->minY = newController->maxY = newController->endY =
-			stickY;
+		newController->stickAverageX = stickX;
+		newController->stickAverageY = stickY;
 
-		processControllerButton(&oldController->down, &newController->down, pad,
-								SDL_GAMEPAD_BUTTON_SOUTH);
-		processControllerButton(&oldController->up, &newController->up, pad,
-								SDL_GAMEPAD_BUTTON_NORTH);
-		processControllerButton(&oldController->left, &newController->left, pad,
-								SDL_GAMEPAD_BUTTON_WEST);
-		processControllerButton(&oldController->right, &newController->right,
-								pad, SDL_GAMEPAD_BUTTON_EAST);
+		// Set isAnalog to true if either stick axis is non-zero, false
+		// otherwise
+		newController->isAnalog = (stickX != 0.0f || stickY != 0.0f);
+
+		processControllerButton(
+			&oldController->actionDown, &newController->actionDown,
+			SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_SOUTH));
+		processControllerButton(
+			&oldController->actionRight, &newController->actionRight,
+			SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_EAST));
+		processControllerButton(
+			&oldController->actionLeft, &newController->actionLeft,
+			SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_WEST));
+		processControllerButton(
+			&oldController->actionUp, &newController->actionUp,
+			SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_NORTH));
 
 		// TODO(bruno): rumble
 	}

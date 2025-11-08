@@ -62,28 +62,29 @@ struct GameButtonState {
 struct GameControllerInput {
 
 	bool isAnalog;
+	bool isConnected;
 
-	real32 startX;
-	real32 startY;
-
-	real32 endX;
-	real32 endY;
-
-	real32 minX;
-	real32 minY;
-
-	real32 maxX;
-	real32 maxY;
+	real32 stickAverageX;
+	real32 stickAverageY;
 
 	union {
-		GameButtonState buttons[6];
+		GameButtonState buttons[12];
 		struct {
-			GameButtonState up;
-			GameButtonState down;
-			GameButtonState left;
-			GameButtonState right;
+			GameButtonState moveUp;
+			GameButtonState moveDown;
+			GameButtonState moveLeft;
+			GameButtonState moveRight;
+
+			GameButtonState actionUp;
+			GameButtonState actionDown;
+			GameButtonState actionLeft;
+			GameButtonState actionRight;
+
 			GameButtonState leftShoulder;
 			GameButtonState rightShoulder;
+
+			GameButtonState back;
+			GameButtonState start;
 		};
 	};
 };
