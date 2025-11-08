@@ -541,7 +541,10 @@ void platformUnloadGameCode(PlatformGameCode *platformGameCode) {
 }
 
 bool platformLoadGameCode(PlatformGameCode *platformGameCode) {
-	platformGameCode->gameLib = dlopen("./target/handmade.so", RTLD_LAZY);
+#ifndef GAME_LIB_PATH
+#define GAME_LIB_PATH "handmade.so"
+#endif
+	platformGameCode->gameLib = dlopen(GAME_LIB_PATH, RTLD_LAZY);
 	if (!platformGameCode->gameLib)
 		return false;
 
