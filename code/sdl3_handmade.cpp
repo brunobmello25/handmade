@@ -16,11 +16,11 @@
  * - getkeyboardlayout
  * */
 
-#include "handmade.cpp"
 #include "handmade.h"
 
 #include <SDL3/SDL.h>
 #include <cstddef>
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/mman.h>
@@ -31,6 +31,8 @@
 
 // TODO(bruno): check deadzone here
 // TODO(bruno): go back to episode 19 to improve audio and video sync
+
+GAME_UPDATE_AND_RENDER globalGameUpdateAndRender;
 
 struct PlatformBackbuffer {
 	int width;
@@ -521,9 +523,29 @@ inline void platformDelayFrame(int64_t frameStart,
 	}
 }
 
+bool platformLoadGameCode() {
+	void *gameLib = dlopen("./target/handmade.so", RTLD_LAZY);
+	if (!gameLib)
+		return false;
+	globalGameUpdateAndRender =
+		(GAME_UPDATE_AND_RENDER)dlsym(gameLib, "gameUpdateAndRender");
+	if (!globalGameUpdateAndRender) {
+		printf("Failed to load gameUpdateAndRender: %s\n", dlerror());
+		dlclose(gameLib);
+		return false;
+	}
+
+	return true;
+}
+
 int main(void) {
 	int initialWidth = 1920 / 2;
 	int initialHeight = 1080 / 2;
+
+	if (!platformLoadGameCode()) {
+		// TODO(bruno): proper error handling
+		return -1;
+	}
 
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD |
 				  SDL_INIT_AUDIO))
@@ -599,8 +621,8 @@ int main(void) {
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
 		}
-		gameUpdateAndRender(&gameMemory, &gamebackbuffer, &gameSoundBuffer,
-							newInput);
+		globalGameUpdateAndRender(&gameMemory, &gamebackbuffer,
+								  &gameSoundBuffer, newInput);
 		platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
 
 #if HANDMADE_INTERNAL

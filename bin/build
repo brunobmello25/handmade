@@ -49,7 +49,8 @@ fi
 case $PLATFORM in
     "sdl3")
         echo "Compiling SDL3 version (system)..."
-        bear -- c++ $COMMON_FLAGS $ARCH_FLAGS ../code/sdl3_handmade.cpp -o handmade$ARCH_SUFFIX `pkg-config sdl3 --cflags --libs` -Wl,-rpath,"$RPATH_DIR"
+        bear -- c++ $COMMON_FLAGS $ARCH_FLAGS -fPIC -shared ../code/handmade.cpp -o handmade.so
+        bear -- c++ $COMMON_FLAGS $ARCH_FLAGS ../code/sdl3_handmade.cpp -o handmade$ARCH_SUFFIX `pkg-config sdl3 --cflags --libs` -Wl,-rpath,"$RPATH_DIR" -ldl
         ;;
     "sdl3-local")
         echo "Compiling SDL3 version (local)..."

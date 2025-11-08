@@ -116,6 +116,14 @@ inline u_int32_t safeTruncateUint64(u_int64_t value) {
 	return result;
 }
 
+typedef void (*GAME_UPDATE_AND_RENDER)(GameMemory *, GameBackbuffer *,
+									   GameSoundBuffer *, GameInput *);
+
+extern "C" {
+void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
+						 GameSoundBuffer *soundBuffer, GameInput *input);
+}
+
 //  NOTE(bruno): services that the platform layer provides to the game
 //  -----------------------------------------------------------------
 //  -----------------------------------------------------------------
