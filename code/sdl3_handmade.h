@@ -30,6 +30,9 @@ struct PlatformState {
 
 	int inputPlaybackHandle;
 	int inputRecordingHandle;
+
+	void *gameMemoryBlock;
+	size_t gameMemorySize;
 };
 
 #define SDL3_HANDMADE_H

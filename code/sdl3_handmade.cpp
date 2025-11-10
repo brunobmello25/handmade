@@ -67,7 +67,7 @@ void platformStartRecordingInput(PlatformState *platformState,
 
 	platformState->inputRecordingIndex = inputRecordingIndex;
 
-	char *filename = "foo.hmi";
+	char *filename = "handmade.hmi";
 	int handle = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
@@ -91,7 +91,7 @@ void platformStartInputPlayback(PlatformState *platformState,
 	assert(platformState->inputPlayingIndex == 0);
 
 	platformState->inputPlayingIndex = playbackIndex;
-	int handle = open("foo.hmi", O_RDONLY);
+	int handle = open("handmade.hmi", O_RDONLY);
 
 	if (handle == -1) {
 		assert(!"Failed to open input playback file for reading");
@@ -146,6 +146,27 @@ void platformProcessKeypress(GameButtonState *newState, bool isDown) {
 	newState->halfTransitionCount++;
 }
 
+void platformWriteMemorySnapshot(void *memory, size_t memorySize, int index) {
+	char *filename = "handmade.hms";
+	int handle = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+	if (handle == -1) {
+		assert(!"Failed to open memory snapshot file for writing");
+	}
+	ssize_t bytesToWrite = memorySize;
+	u_int8_t *nextByteLocation = (u_int8_t *)memory;
+	while (bytesToWrite) {
+		ssize_t bytesWritten = write(handle, nextByteLocation, bytesToWrite);
+		if (bytesWritten == -1) {
+			return;
+		}
+
+		bytesToWrite -= bytesWritten;
+		nextByteLocation += bytesWritten;
+	}
+	close(handle);
+}
+
 bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 						   GameControllerInput *keyboardInput,
 						   PlatformState *platformState) {
@@ -179,6 +200,9 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 				if (!platformState->inputRecordingIndex &&
 					!platformState->inputPlayingIndex) {
 					platformStartRecordingInput(platformState, 1);
+					// platformWriteMemorySnapshot(platformState->gameMemoryBlock,
+					// 							platformState->gameMemorySize,
+					// 							1);
 				} else if (platformState->inputRecordingIndex) {
 					platformEndRecordingInput(platformState);
 					platformStartInputPlayback(platformState, 1);
@@ -526,7 +550,8 @@ bool platformShouldQueueAudioSamples() {
 	return queuedSamples < targetQueuedSamples;
 }
 
-bool platformInitializeGameMemory(GameMemory *gameMemory) {
+bool platformInitializeGameMemory(GameMemory *gameMemory,
+								  PlatformState *platformState) {
 	gameMemory->permanentStorageSize = Megabytes(64);
 	gameMemory->transientStorageSize = Gigabytes(4);
 
@@ -554,6 +579,9 @@ bool platformInitializeGameMemory(GameMemory *gameMemory) {
 	gameMemory->DEBUGPlatformReadEntireFile = &DEBUGPlatformReadEntireFile;
 	gameMemory->DEBUGPlatformFreeFileMemory = &DEBUGPlatformFreeFileMemory;
 	gameMemory->DEBUGPlatformWriteEntireFile = &DEBUGPlatformWriteEntireFile;
+
+	platformState->gameMemoryBlock = memory;
+	platformState->gameMemorySize = totalSize;
 
 	return true;
 }
@@ -668,14 +696,15 @@ int main(void) {
 									// too slow, lower it to 30fps
 
 	GameMemory gameMemory = {};
-	if (!platformInitializeGameMemory(&gameMemory)) {
+	PlatformState platformState = {};
+
+	if (!platformInitializeGameMemory(&gameMemory, &platformState)) {
 		return -1; // TODO(bruno): proper error handling
 	}
 
 	platformInitializeSound(&globalAudioOutput);
 
 	globalRunning = true;
-	PlatformState platformState = {};
 
 	globalBackbuffer = {};
 	platformResizeBackbuffer(&globalBackbuffer, renderer, initialWidth,
