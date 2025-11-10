@@ -16,9 +16,6 @@
  * - getkeyboardlayout
  * */
 
-#include "handmade.h"
-
-#include <SDL3/SDL.h>
 #include <cstddef>
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -29,29 +26,10 @@
 #include <unistd.h>
 #include <x86intrin.h>
 
+#include "sdl3_handmade.h"
+
 // TODO(bruno): check deadzone here
 // TODO(bruno): go back to episode 19 to improve audio and video sync
-
-struct PlatformBackbuffer {
-	int width;
-	int height;
-	int pitch;
-	void *memory;
-	SDL_Texture *texture;
-};
-
-struct PlatformAudioOutput {
-	SDL_AudioDeviceID device;
-	SDL_AudioStream *stream;
-	int sampleRate;
-	int numChannels;
-};
-
-struct PlatformGameCode {
-	void *gameLib;
-	GAME_UPDATE_AND_RENDER gameUpdateAndRender;
-	bool loaded;
-};
 
 global_variable bool globalRunning;
 
@@ -82,14 +60,143 @@ void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
 }
 
+void platformStartRecordingInput(PlatformState *platformState,
+								 int inputRecordingIndex) {
+	assert(platformState->inputPlayingIndex != inputRecordingIndex);
+	assert(platformState->inputRecordingIndex == 0);
+
+	platformState->inputRecordingIndex = inputRecordingIndex;
+
+	char *filename = "handmade.hmi";
+	int handle = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+	if (handle == -1) {
+		assert(!"Failed to open input recording file for writing");
+	}
+
+	platformState->inputRecordingHandle = handle;
+}
+
+void platformEndRecordingInput(PlatformState *platformState) {
+	assert(platformState->inputRecordingIndex != 0);
+
+	close(platformState->inputRecordingHandle);
+	platformState->inputRecordingIndex = 0;
+}
+
+void platformStartInputPlayback(PlatformState *platformState,
+								int playbackIndex) {
+	assert(platformState->inputRecordingIndex != playbackIndex);
+	assert(platformState->inputPlayingIndex == 0);
+
+	platformState->inputPlayingIndex = playbackIndex;
+	int handle = open("handmade.hmi", O_RDONLY);
+
+	if (handle == -1) {
+		assert(!"Failed to open input playback file for reading");
+	}
+
+	platformState->inputPlaybackHandle = handle;
+}
+
+void platformStopInputPlayback(PlatformState *platformState) {
+	assert(platformState->inputPlayingIndex != 0);
+
+	close(platformState->inputPlaybackHandle);
+	platformState->inputPlayingIndex = 0;
+}
+
+void platformRecordInput(PlatformState platformState, GameInput input) {
+	ssize_t bytesToWrite = sizeof(input);
+	u_int8_t *nextByteLocation = (u_int8_t *)&input;
+	while (bytesToWrite) {
+		ssize_t bytesWritten = write(platformState.inputRecordingHandle,
+									 nextByteLocation, bytesToWrite);
+		if (bytesWritten == -1) {
+			return;
+		}
+
+		bytesToWrite -= bytesWritten;
+		nextByteLocation += bytesWritten;
+	}
+}
+
+void platformReadMemorySnapshot(void *memory, size_t memorySize, int index) {
+	char *filename = "handmade.hms";
+	int handle = open(filename, O_RDONLY);
+	if (handle == -1) {
+		assert(!"Failed to open memory snapshot file for reading");
+	}
+	ssize_t bytesToRead = memorySize;
+	u_int8_t *nextByteLocation = (u_int8_t *)memory;
+	while (bytesToRead) {
+		ssize_t bytesRead = read(handle, nextByteLocation, bytesToRead);
+		if (bytesRead == -1) {
+			close(handle);
+			return;
+		}
+		if (bytesRead == 0) {
+			// Reached end of file before reading all expected bytes
+			assert(!"Memory snapshot file is smaller than expected");
+		}
+
+		bytesToRead -= bytesRead;
+		nextByteLocation += bytesRead;
+	}
+	close(handle);
+}
+
+void platformPlaybackInput(PlatformState *platformState, GameInput *input) {
+	ssize_t bytesToRead = sizeof(*input);
+	u_int8_t *nextByteLocation = (u_int8_t *)input;
+	while (bytesToRead) {
+		ssize_t bytesRead = read(platformState->inputPlaybackHandle,
+								 nextByteLocation, bytesToRead);
+		if (bytesRead == 0) {
+			lseek(platformState->inputPlaybackHandle, 0, SEEK_SET);
+			platformReadMemorySnapshot(platformState->gamePermanentStorage,
+									   platformState->permanentStorageSize, 1);
+		}
+		if (bytesRead == -1) {
+			return;
+		}
+
+		bytesToRead -= bytesRead;
+		nextByteLocation += bytesRead;
+	}
+}
+
 void platformProcessKeypress(GameButtonState *newState, bool isDown) {
 	assert(newState->endedDown != isDown);
 	newState->endedDown = isDown;
 	newState->halfTransitionCount++;
 }
 
+void platformWriteMemorySnapshot(void *memory, size_t memorySize, int index) {
+	char *filename = "handmade.hms";
+	int handle = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+	if (handle == -1) {
+		assert(!"Failed to open memory snapshot file for writing");
+	}
+	ssize_t bytesToWrite = memorySize;
+	u_int8_t *nextByteLocation = (u_int8_t *)memory;
+	while (bytesToWrite) {
+		ssize_t bytesWritten = write(handle, nextByteLocation, bytesToWrite);
+		if (bytesWritten == -1) {
+			return;
+		}
+
+		bytesToWrite -= bytesWritten;
+		nextByteLocation += bytesWritten;
+	}
+	close(handle);
+}
+
 bool platformProcessEvents(PlatformBackbuffer *backbuffer,
-						   GameControllerInput *keyboardInput) {
+						   GameControllerInput *keyboardInput,
+						   PlatformState *platformState) {
 
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
@@ -115,6 +222,28 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 				platformProcessKeypress(&keyboardInput->moveDown, isDown);
 			if (event.key.key == SDLK_D)
 				platformProcessKeypress(&keyboardInput->moveRight, isDown);
+
+			if (event.key.key == SDLK_L && isDown) {
+				if (!platformState->inputRecordingIndex &&
+					!platformState->inputPlayingIndex) {
+					platformStartRecordingInput(platformState, 1);
+					platformWriteMemorySnapshot(
+						platformState->gamePermanentStorage,
+						platformState->permanentStorageSize, 1);
+				} else if (platformState->inputRecordingIndex) {
+					platformEndRecordingInput(platformState);
+					platformReadMemorySnapshot(
+						platformState->gamePermanentStorage,
+						platformState->permanentStorageSize, 1);
+					platformStartInputPlayback(platformState, 1);
+				} else if (platformState->inputPlayingIndex) {
+					platformStopInputPlayback(platformState);
+				} else {
+					// TODO(bruno): probably want to handle multiple playback
+					// indexes here
+					assert(!"Impossible state in input recording/playback");
+				}
+			}
 		}
 		if (event.type == SDL_EVENT_WINDOW_RESIZED) {
 			SDL_Window *window = SDL_GetWindowFromEvent(&event);
@@ -451,7 +580,8 @@ bool platformShouldQueueAudioSamples() {
 	return queuedSamples < targetQueuedSamples;
 }
 
-bool platformInitializeGameMemory(GameMemory *gameMemory) {
+bool platformInitializeGameMemory(GameMemory *gameMemory,
+								  PlatformState *platformState) {
 	gameMemory->permanentStorageSize = Megabytes(64);
 	gameMemory->transientStorageSize = Gigabytes(4);
 
@@ -479,6 +609,10 @@ bool platformInitializeGameMemory(GameMemory *gameMemory) {
 	gameMemory->DEBUGPlatformReadEntireFile = &DEBUGPlatformReadEntireFile;
 	gameMemory->DEBUGPlatformFreeFileMemory = &DEBUGPlatformFreeFileMemory;
 	gameMemory->DEBUGPlatformWriteEntireFile = &DEBUGPlatformWriteEntireFile;
+
+	platformState->gamePermanentStorage = memory;
+	platformState->permanentStorageSize = totalSize;
+	platformState->permanentStorageSize = gameMemory->permanentStorageSize;
 
 	return true;
 }
@@ -593,7 +727,9 @@ int main(void) {
 									// too slow, lower it to 30fps
 
 	GameMemory gameMemory = {};
-	if (!platformInitializeGameMemory(&gameMemory)) {
+	PlatformState platformState = {};
+
+	if (!platformInitializeGameMemory(&gameMemory, &platformState)) {
 		return -1; // TODO(bruno): proper error handling
 	}
 
@@ -629,7 +765,8 @@ int main(void) {
 			newKeyboard->buttons[i].endedDown =
 				oldKeyboard->buttons[i].endedDown;
 		}
-		globalRunning = platformProcessEvents(&globalBackbuffer, newKeyboard);
+		globalRunning = platformProcessEvents(&globalBackbuffer, newKeyboard,
+											  &platformState);
 
 		GameBackbuffer gamebackbuffer = {};
 		gamebackbuffer.width = globalBackbuffer.width;
@@ -647,6 +784,14 @@ int main(void) {
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
 		}
+
+		if (platformState.inputRecordingIndex) {
+			platformRecordInput(platformState, *newInput);
+		}
+		if (platformState.inputPlayingIndex) {
+			platformPlaybackInput(&platformState, newInput);
+		}
+
 		gameCode.gameUpdateAndRender(&gameMemory, &gamebackbuffer,
 									 &gameSoundBuffer, newInput);
 		platformOutputSound(&globalAudioOutput, &gameSoundBuffer);

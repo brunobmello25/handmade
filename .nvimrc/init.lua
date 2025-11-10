@@ -1,6 +1,6 @@
 vim.keymap.set("n", "<M-m>", function()
 	-- vim.cmd("!bin/build && target/handmade")
-	vim.cmd("!bin/build")
+	vim.cmd("!BUILD_PLATFORM=1 bin/build")
 end, {})
 
 local build_augroup = vim.api.nvim_create_augroup("build", { clear = true })

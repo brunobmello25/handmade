@@ -19,6 +19,24 @@ void renderWeirdGradient(GameBackbuffer *buffer, int blueOffset,
 	}
 }
 
+void renderPlayer(GameBackbuffer *buffer, int playerX, int playerY) {
+	for (int y = -5; y <= 5; ++y) {
+		for (int x = -5; x <= 5; ++x) {
+			int pixelX = playerX + x;
+			int pixelY = playerY + y;
+
+			// Bounds checking
+			if (pixelX >= 0 && pixelX < buffer->width && pixelY >= 0 &&
+				pixelY < buffer->height) {
+				uint8_t *row =
+					(uint8_t *)buffer->memory + (pixelY * buffer->pitch);
+				uint32_t *pixel = (uint32_t *)row + pixelX;
+				*pixel = 0xFFFFFFFF; // White color (ARGB)
+			}
+		}
+	}
+}
+
 void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 	if (soundBuffer->sampleCount == 0)
 		return;
@@ -30,7 +48,14 @@ void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 
 	for (int i = 0; i < soundBuffer->sampleCount; i++) {
 		real32 sineValue = sinf(gameState->tsine);
+
+		// TODO(bruno): ditch this compile-time flag once we stop debugging
+		// audio with a sine wave
+#if ENABLE_SINE_WAVE
 		int16_t sampleValue = (int16_t)(sineValue * toneVolume);
+#else
+		int16_t sampleValue = 0;
+#endif
 		*sampleOut++ = sampleValue;
 		*sampleOut++ = sampleValue;
 
@@ -61,30 +86,58 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 		gameState->xOffset = 0;
 		gameState->yOffset = 0;
 		gameState->tsine = 0.0f;
+		gameState->playerX = 150;
+		gameState->playerY = 150;
 
 		gameMemory->isInitialized = true;
 	}
 
-	int moveSpeed = 8;
+	int gradientSpeed = 4;
+	int playerSpeed = 8;
+
 	for (size_t i = 0; i < arraylength(input->controllers); i++) {
 		GameControllerInput *controller = gameGetController(input, i);
 
 		if (controller->isAnalog) {
 			gameState->xOffset +=
-				(int)((real32)moveSpeed * controller->stickAverageX);
+				(int)((real32)gradientSpeed * controller->stickAverageX);
 			gameState->yOffset +=
-				(int)((real32)moveSpeed * controller->stickAverageY);
+				(int)((real32)gradientSpeed * controller->stickAverageY);
 			gameState->toneHz =
 				256 + (int)(256.0f * (controller->stickAverageY / 8.0f));
+
+			gameState->playerX +=
+				(int)(playerSpeed * controller->stickAverageX);
+			gameState->playerY +=
+				(int)(playerSpeed * controller->stickAverageY);
+
+			if (gameState->playerX < 0)
+				gameState->playerX = backbuffer->width + gameState->playerX;
+			if (gameState->playerY < 0)
+				gameState->playerY = backbuffer->height + gameState->playerY;
+			gameState->playerX %= backbuffer->width;
+			gameState->playerY %= backbuffer->height;
 		} else {
-			if (controller->moveUp.endedDown)
-				gameState->yOffset -= moveSpeed;
-			if (controller->moveDown.endedDown)
-				gameState->yOffset += moveSpeed;
-			if (controller->moveLeft.endedDown)
-				gameState->xOffset -= moveSpeed;
-			if (controller->moveRight.endedDown)
-				gameState->xOffset += moveSpeed;
+			if (controller->moveUp.endedDown) {
+				gameState->yOffset -= gradientSpeed;
+				gameState->playerY -= playerSpeed;
+			}
+			if (controller->moveDown.endedDown) {
+				gameState->yOffset += gradientSpeed;
+				gameState->playerY += playerSpeed;
+			}
+			if (controller->moveLeft.endedDown) {
+				gameState->xOffset -= gradientSpeed;
+				gameState->playerX -= playerSpeed;
+			}
+			if (controller->moveRight.endedDown) {
+				gameState->xOffset += gradientSpeed;
+				gameState->playerX += playerSpeed;
+			}
+		}
+
+		if (controller->actionDown.endedDown) {
+			gameState->playerY -= playerSpeed;
 		}
 	}
 
@@ -93,4 +146,5 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 								// here for more robust platform options
 
 	renderWeirdGradient(backbuffer, gameState->xOffset, gameState->yOffset);
+	renderPlayer(backbuffer, gameState->playerX, gameState->playerY);
 }

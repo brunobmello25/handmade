@@ -4,7 +4,10 @@ target
 handmade
 core.*
 
+*.hmi
+*.hms
 teste.md
 
 # External dependencies
 external/
+
