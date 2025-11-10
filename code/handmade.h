@@ -7,7 +7,10 @@
 
 #define assert(expression)                                                     \
 	if (!(expression)) {                                                       \
-		*(int *)0 = 0;                                                         \
+		_Pragma("GCC diagnostic push")                                         \
+				_Pragma("GCC diagnostic ignored \"-Wnull-dereference\"") *     \
+			(int *)0 = 0;                                                      \
+		_Pragma("GCC diagnostic pop")                                          \
 	}
 
 #define arraylength(array) (sizeof(array) / sizeof((array)[0]))
