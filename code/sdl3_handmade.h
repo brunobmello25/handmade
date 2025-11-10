@@ -24,5 +24,13 @@ struct PlatformGameCode {
 	bool loaded;
 };
 
+struct PlatformState {
+	int inputRecordingIndex;
+	int inputPlayingIndex;
+
+	int inputPlaybackHandle;
+	int inputRecordingHandle;
+};
+
 #define SDL3_HANDMADE_H
 #endif // SDL3_HANDMADE_H

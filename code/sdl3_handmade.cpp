@@ -60,13 +60,64 @@ void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 						  SDL_TEXTUREACCESS_STREAMING, width, height);
 }
 
+void platformStartRecordingInput(PlatformState *platformState,
+								 int inputRecordingIndex) {
+	platformState->inputRecordingIndex = inputRecordingIndex;
+
+	char *filename = "foo.hmi";
+	int handle = open(filename, O_WRONLY | O_CREAT,
+					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+	if (handle == -1) {
+		assert(!"Failed to open input recording file for writing");
+	}
+}
+
+void platformEndRecordingInput(PlatformState *platformState) {
+	close(platformState->inputRecordingHandle);
+}
+
+void platformStartInputPlayback(PlatformState *platformState,
+								int playbackIndex) {}
+
+void platformRecordInput(PlatformState platformState, GameInput input) {
+	ssize_t bytesToWrite = sizeof(input);
+	u_int8_t *nextByteLocation = (u_int8_t *)&input;
+	while (bytesToWrite) {
+		ssize_t bytesWritten = write(platformState.inputRecordingHandle,
+									 nextByteLocation, bytesToWrite);
+		if (bytesWritten == -1) {
+			return;
+		}
+
+		bytesToWrite -= bytesWritten;
+		nextByteLocation += bytesWritten;
+	}
+}
+
+void platformPlaybackInput(PlatformState platformState, GameInput *input) {
+	ssize_t bytesToRead = sizeof(*input);
+	u_int8_t *nextByteLocation = (u_int8_t *)input;
+	while (bytesToRead) {
+		ssize_t bytesRead = read(platformState.inputPlaybackHandle,
+								 nextByteLocation, bytesToRead);
+		if (bytesRead == -1) {
+			return;
+		}
+
+		bytesToRead -= bytesRead;
+		nextByteLocation += bytesRead;
+	}
+}
+
 void platformProcessKeypress(GameButtonState *newState, bool isDown) {
 	assert(newState->endedDown != isDown);
 	newState->endedDown = isDown;
 	newState->halfTransitionCount++;
 }
 
-bool platformProcessEvents(PlatformBackbuffer *backbuffer,
+bool platformProcessEvents(PlatformState *platformState,
+						   PlatformBackbuffer *backbuffer,
 						   GameControllerInput *keyboardInput) {
 
 	SDL_Event event;
@@ -93,6 +144,14 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 				platformProcessKeypress(&keyboardInput->moveDown, isDown);
 			if (event.key.key == SDLK_D)
 				platformProcessKeypress(&keyboardInput->moveRight, isDown);
+
+			if (event.key.key == SDLK_L && isDown) {
+				if (platformState->inputRecordingIndex == 0) {
+					platformStartRecordingInput(platformState, 1);
+				} else {
+					platformEndRecordingInput(platformState);
+				}
+			}
 		}
 		if (event.type == SDL_EVENT_WINDOW_RESIZED) {
 			SDL_Window *window = SDL_GetWindowFromEvent(&event);
@@ -578,6 +637,7 @@ int main(void) {
 	platformInitializeSound(&globalAudioOutput);
 
 	globalRunning = true;
+	PlatformState platformState = {};
 
 	globalBackbuffer = {};
 	platformResizeBackbuffer(&globalBackbuffer, renderer, initialWidth,
@@ -625,6 +685,14 @@ int main(void) {
 			gameSoundBuffer.sampleRate = globalAudioOutput.sampleRate;
 			gameSoundBuffer.samples = samples;
 		}
+
+		if (platformState.inputRecordingIndex) {
+			platformRecordInput(platformState, newInput);
+		}
+		if (platformState.inputPlayingIndex) {
+			platformPlaybackInput(platformState, &newInput);
+		}
+
 		gameCode.gameUpdateAndRender(&gameMemory, &gamebackbuffer,
 									 &gameSoundBuffer, newInput);
 		platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
