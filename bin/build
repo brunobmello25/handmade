@@ -3,14 +3,11 @@
 set -e
 
 PLATFORM=${1:-sdl3}
-ARCH=${2:-64}
 
 usage() {
     echo "Usage: $0 [sdl3|sdl3-local] [32|64]"
     echo "  sdl3:        Build with SDL3 (system/pkg-config)"
     echo "  sdl3-local:  Build with local SDL3 from external/"
-    echo "  32:          Build 32-bit binary"
-    echo "  64:          Build 64-bit binary (default)"
     echo ""
     echo "Environment variables:"
     echo "  USE_BEAR=1          Generate compile_commands.json (slower build)"
@@ -26,13 +23,6 @@ if [[ "$PLATFORM" != "sdl3" && "$PLATFORM" != "sdl3-local" ]]; then
     echo "Error: Invalid platform '$PLATFORM'"
     usage
 fi
-
-if [[ "$ARCH" != "32" && "$ARCH" != "64" ]]; then
-    echo "Error: Invalid architecture '$ARCH'"
-    usage
-fi
-
-echo "Building for platform: $PLATFORM (${ARCH}-bit)"
 
 # Set up compiler wrapper (bear only if requested)
 if [ "$USE_BEAR" = "1" ]; then
