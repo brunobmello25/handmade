@@ -122,14 +122,41 @@ void platformRecordInput(PlatformState platformState, GameInput input) {
 	}
 }
 
-void platformPlaybackInput(PlatformState platformState, GameInput *input) {
+void platformReadMemorySnapshot(void *memory, size_t memorySize, int index) {
+	char *filename = "handmade.hms";
+	int handle = open(filename, O_RDONLY);
+	if (handle == -1) {
+		assert(!"Failed to open memory snapshot file for reading");
+	}
+	ssize_t bytesToRead = memorySize;
+	u_int8_t *nextByteLocation = (u_int8_t *)memory;
+	while (bytesToRead) {
+		ssize_t bytesRead = read(handle, nextByteLocation, bytesToRead);
+		if (bytesRead == -1) {
+			close(handle);
+			return;
+		}
+		if (bytesRead == 0) {
+			// Reached end of file before reading all expected bytes
+			assert(!"Memory snapshot file is smaller than expected");
+		}
+
+		bytesToRead -= bytesRead;
+		nextByteLocation += bytesRead;
+	}
+	close(handle);
+}
+
+void platformPlaybackInput(PlatformState *platformState, GameInput *input) {
 	ssize_t bytesToRead = sizeof(*input);
 	u_int8_t *nextByteLocation = (u_int8_t *)input;
 	while (bytesToRead) {
-		ssize_t bytesRead = read(platformState.inputPlaybackHandle,
+		ssize_t bytesRead = read(platformState->inputPlaybackHandle,
 								 nextByteLocation, bytesToRead);
 		if (bytesRead == 0) {
-			lseek(platformState.inputPlaybackHandle, 0, SEEK_SET);
+			lseek(platformState->inputPlaybackHandle, 0, SEEK_SET);
+			platformReadMemorySnapshot(platformState->gamePermanentStorage,
+									   platformState->permanentStorageSize, 1);
 		}
 		if (bytesRead == -1) {
 			return;
@@ -200,11 +227,14 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 				if (!platformState->inputRecordingIndex &&
 					!platformState->inputPlayingIndex) {
 					platformStartRecordingInput(platformState, 1);
-					platformWriteMemorySnapshot(platformState->gameMemoryBlock,
-												platformState->gameMemorySize,
-												1);
+					platformWriteMemorySnapshot(
+						platformState->gamePermanentStorage,
+						platformState->permanentStorageSize, 1);
 				} else if (platformState->inputRecordingIndex) {
 					platformEndRecordingInput(platformState);
+					platformReadMemorySnapshot(
+						platformState->gamePermanentStorage,
+						platformState->permanentStorageSize, 1);
 					platformStartInputPlayback(platformState, 1);
 				} else if (platformState->inputPlayingIndex) {
 					platformStopInputPlayback(platformState);
@@ -580,8 +610,9 @@ bool platformInitializeGameMemory(GameMemory *gameMemory,
 	gameMemory->DEBUGPlatformFreeFileMemory = &DEBUGPlatformFreeFileMemory;
 	gameMemory->DEBUGPlatformWriteEntireFile = &DEBUGPlatformWriteEntireFile;
 
-	platformState->gameMemoryBlock = memory;
-	platformState->gameMemorySize = totalSize;
+	platformState->gamePermanentStorage = memory;
+	platformState->permanentStorageSize = totalSize;
+	platformState->permanentStorageSize = gameMemory->permanentStorageSize;
 
 	return true;
 }
@@ -758,7 +789,7 @@ int main(void) {
 			platformRecordInput(platformState, *newInput);
 		}
 		if (platformState.inputPlayingIndex) {
-			platformPlaybackInput(platformState, newInput);
+			platformPlaybackInput(&platformState, newInput);
 		}
 
 		gameCode.gameUpdateAndRender(&gameMemory, &gamebackbuffer,
