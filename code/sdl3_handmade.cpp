@@ -200,9 +200,9 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 				if (!platformState->inputRecordingIndex &&
 					!platformState->inputPlayingIndex) {
 					platformStartRecordingInput(platformState, 1);
-					// platformWriteMemorySnapshot(platformState->gameMemoryBlock,
-					// 							platformState->gameMemorySize,
-					// 							1);
+					platformWriteMemorySnapshot(platformState->gameMemoryBlock,
+												platformState->gameMemorySize,
+												1);
 				} else if (platformState->inputRecordingIndex) {
 					platformEndRecordingInput(platformState);
 					platformStartInputPlayback(platformState, 1);

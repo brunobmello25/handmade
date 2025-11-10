@@ -118,14 +118,22 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			gameState->playerX %= backbuffer->width;
 			gameState->playerY %= backbuffer->height;
 		} else {
-			if (controller->moveUp.endedDown)
+			if (controller->moveUp.endedDown) {
 				gameState->yOffset -= gradientSpeed;
-			if (controller->moveDown.endedDown)
+				gameState->playerY -= playerSpeed;
+			}
+			if (controller->moveDown.endedDown) {
 				gameState->yOffset += gradientSpeed;
-			if (controller->moveLeft.endedDown)
+				gameState->playerY += playerSpeed;
+			}
+			if (controller->moveLeft.endedDown) {
 				gameState->xOffset -= gradientSpeed;
-			if (controller->moveRight.endedDown)
+				gameState->playerX -= playerSpeed;
+			}
+			if (controller->moveRight.endedDown) {
 				gameState->xOffset += gradientSpeed;
+				gameState->playerX += playerSpeed;
+			}
 		}
 
 		if (controller->actionDown.endedDown) {
