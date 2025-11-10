@@ -62,23 +62,50 @@ void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 
 void platformStartRecordingInput(PlatformState *platformState,
 								 int inputRecordingIndex) {
+	assert(platformState->inputPlayingIndex != inputRecordingIndex);
+	assert(platformState->inputRecordingIndex == 0);
+
 	platformState->inputRecordingIndex = inputRecordingIndex;
 
 	char *filename = "foo.hmi";
-	int handle = open(filename, O_WRONLY | O_CREAT,
+	int handle = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
 	if (handle == -1) {
 		assert(!"Failed to open input recording file for writing");
 	}
+
+	platformState->inputRecordingHandle = handle;
 }
 
 void platformEndRecordingInput(PlatformState *platformState) {
+	assert(platformState->inputRecordingIndex != 0);
+
 	close(platformState->inputRecordingHandle);
+	platformState->inputRecordingIndex = 0;
 }
 
 void platformStartInputPlayback(PlatformState *platformState,
-								int playbackIndex) {}
+								int playbackIndex) {
+	assert(platformState->inputRecordingIndex != playbackIndex);
+	assert(platformState->inputPlayingIndex == 0);
+
+	platformState->inputPlayingIndex = playbackIndex;
+	int handle = open("foo.hmi", O_RDONLY);
+
+	if (handle == -1) {
+		assert(!"Failed to open input playback file for reading");
+	}
+
+	platformState->inputPlaybackHandle = handle;
+}
+
+void platformStopInputPlayback(PlatformState *platformState) {
+	assert(platformState->inputPlayingIndex != 0);
+
+	close(platformState->inputPlaybackHandle);
+	platformState->inputPlayingIndex = 0;
+}
 
 void platformRecordInput(PlatformState platformState, GameInput input) {
 	ssize_t bytesToWrite = sizeof(input);
@@ -101,6 +128,9 @@ void platformPlaybackInput(PlatformState platformState, GameInput *input) {
 	while (bytesToRead) {
 		ssize_t bytesRead = read(platformState.inputPlaybackHandle,
 								 nextByteLocation, bytesToRead);
+		if (bytesRead == 0) {
+			lseek(platformState.inputPlaybackHandle, 0, SEEK_SET);
+		}
 		if (bytesRead == -1) {
 			return;
 		}
@@ -116,9 +146,9 @@ void platformProcessKeypress(GameButtonState *newState, bool isDown) {
 	newState->halfTransitionCount++;
 }
 
-bool platformProcessEvents(PlatformState *platformState,
-						   PlatformBackbuffer *backbuffer,
-						   GameControllerInput *keyboardInput) {
+bool platformProcessEvents(PlatformBackbuffer *backbuffer,
+						   GameControllerInput *keyboardInput,
+						   PlatformState *platformState) {
 
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
@@ -146,10 +176,18 @@ bool platformProcessEvents(PlatformState *platformState,
 				platformProcessKeypress(&keyboardInput->moveRight, isDown);
 
 			if (event.key.key == SDLK_L && isDown) {
-				if (platformState->inputRecordingIndex == 0) {
+				if (!platformState->inputRecordingIndex &&
+					!platformState->inputPlayingIndex) {
 					platformStartRecordingInput(platformState, 1);
-				} else {
+				} else if (platformState->inputRecordingIndex) {
 					platformEndRecordingInput(platformState);
+					platformStartInputPlayback(platformState, 1);
+				} else if (platformState->inputPlayingIndex) {
+					platformStopInputPlayback(platformState);
+				} else {
+					// TODO(bruno): probably want to handle multiple playback
+					// indexes here
+					assert(!"Impossible state in input recording/playback");
 				}
 			}
 		}
@@ -667,7 +705,8 @@ int main(void) {
 			newKeyboard->buttons[i].endedDown =
 				oldKeyboard->buttons[i].endedDown;
 		}
-		globalRunning = platformProcessEvents(&globalBackbuffer, newKeyboard);
+		globalRunning = platformProcessEvents(&globalBackbuffer, newKeyboard,
+											  &platformState);
 
 		GameBackbuffer gamebackbuffer = {};
 		gamebackbuffer.width = globalBackbuffer.width;
@@ -687,10 +726,10 @@ int main(void) {
 		}
 
 		if (platformState.inputRecordingIndex) {
-			platformRecordInput(platformState, newInput);
+			platformRecordInput(platformState, *newInput);
 		}
 		if (platformState.inputPlayingIndex) {
-			platformPlaybackInput(platformState, &newInput);
+			platformPlaybackInput(platformState, newInput);
 		}
 
 		gameCode.gameUpdateAndRender(&gameMemory, &gamebackbuffer,
