@@ -16,9 +16,6 @@
  * - getkeyboardlayout
  * */
 
-#include "handmade.h"
-
-#include <SDL3/SDL.h>
 #include <cstddef>
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -29,29 +26,10 @@
 #include <unistd.h>
 #include <x86intrin.h>
 
+#include "sdl3_handmade.h"
+
 // TODO(bruno): check deadzone here
 // TODO(bruno): go back to episode 19 to improve audio and video sync
-
-struct PlatformBackbuffer {
-	int width;
-	int height;
-	int pitch;
-	void *memory;
-	SDL_Texture *texture;
-};
-
-struct PlatformAudioOutput {
-	SDL_AudioDeviceID device;
-	SDL_AudioStream *stream;
-	int sampleRate;
-	int numChannels;
-};
-
-struct PlatformGameCode {
-	void *gameLib;
-	GAME_UPDATE_AND_RENDER gameUpdateAndRender;
-	bool loaded;
-};
 
 global_variable bool globalRunning;
 
