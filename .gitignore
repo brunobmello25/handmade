@@ -11,3 +11,5 @@ teste.md
 # External dependencies
 external/
 
+snapshots/*
+!snapshots/.gitkeep

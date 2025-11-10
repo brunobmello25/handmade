@@ -31,6 +31,9 @@
 // TODO(bruno): check deadzone here
 // TODO(bruno): go back to episode 19 to improve audio and video sync
 
+#define INPUT_SNAPSHOT_PATH "snapshots/handmade.hmi"
+#define MEMORY_SNAPSHOT_PATH "snapshots/handmade.hms"
+
 global_variable bool globalRunning;
 
 global_variable PlatformBackbuffer globalBackbuffer;
@@ -67,8 +70,7 @@ void platformStartRecordingInput(PlatformState *platformState,
 
 	platformState->inputRecordingIndex = inputRecordingIndex;
 
-	char *filename = "handmade.hmi";
-	int handle = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+	int handle = open(INPUT_SNAPSHOT_PATH, O_WRONLY | O_CREAT | O_TRUNC,
 					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
 	if (handle == -1) {
@@ -91,7 +93,7 @@ void platformStartInputPlayback(PlatformState *platformState,
 	assert(platformState->inputPlayingIndex == 0);
 
 	platformState->inputPlayingIndex = playbackIndex;
-	int handle = open("handmade.hmi", O_RDONLY);
+	int handle = open(INPUT_SNAPSHOT_PATH, O_RDONLY);
 
 	if (handle == -1) {
 		assert(!"Failed to open input playback file for reading");
@@ -123,8 +125,7 @@ void platformRecordInput(PlatformState platformState, GameInput input) {
 }
 
 void platformReadMemorySnapshot(void *memory, size_t memorySize, int index) {
-	char *filename = "handmade.hms";
-	int handle = open(filename, O_RDONLY);
+	int handle = open(MEMORY_SNAPSHOT_PATH, O_RDONLY);
 	if (handle == -1) {
 		assert(!"Failed to open memory snapshot file for reading");
 	}
@@ -174,8 +175,7 @@ void platformProcessKeypress(GameButtonState *newState, bool isDown) {
 }
 
 void platformWriteMemorySnapshot(void *memory, size_t memorySize, int index) {
-	char *filename = "handmade.hms";
-	int handle = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+	int handle = open(MEMORY_SNAPSHOT_PATH, O_WRONLY | O_CREAT | O_TRUNC,
 					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (handle == -1) {
 		assert(!"Failed to open memory snapshot file for writing");
