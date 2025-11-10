@@ -120,6 +120,9 @@ struct GameState {
 	int xOffset;
 	int yOffset;
 	real32 tsine;
+
+	int playerX;
+	int playerY;
 };
 
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
