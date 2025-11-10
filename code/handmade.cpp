@@ -48,7 +48,10 @@ void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 
 	for (int i = 0; i < soundBuffer->sampleCount; i++) {
 		real32 sineValue = sinf(gameState->tsine);
-#if 0
+
+		// TODO(bruno): ditch this compile-time flag once we stop debugging
+		// audio with a sine wave
+#if ENABLE_SINE_WAVE
 		int16_t sampleValue = (int16_t)(sineValue * toneVolume);
 #else
 		int16_t sampleValue = 0;
