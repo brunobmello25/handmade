@@ -15,3 +15,6 @@ IndentCaseLabels: true
 
 # do NOT collapse short blocks onto one line
 AllowShortBlocksOnASingleLine: false
+
+# Allow short if statements on a single line
+AllowShortIfStatementsOnASingleLine: Always

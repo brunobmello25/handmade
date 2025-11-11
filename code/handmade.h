@@ -5,6 +5,17 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+typedef float real32;
+typedef double real64;
+typedef int8_t int8;
+typedef int16_t int16;
+typedef int32_t int32;
+typedef int64_t int64;
+typedef uint8_t uint8;
+typedef uint16_t uint16;
+typedef uint32_t uint32;
+typedef uint64_t uint64;
+
 #define assert(expression)                                                     \
 	if (!(expression)) {                                                       \
 		_Pragma("GCC diagnostic push")                                         \
@@ -37,17 +48,12 @@ struct DEBUGReadFileResult {
 
 typedef DEBUGReadFileResult (*DEBUGPlatformReadEntireFileFunc)(const char *);
 typedef void (*DEBUGPlatformFreeFileMemoryFunc)(void *);
-typedef bool (*DEBUGPlatformWriteEntireFileFunc)(const char *, u_int32_t,
-												 void *);
+typedef bool (*DEBUGPlatformWriteEntireFileFunc)(const char *, uint32, void *);
 #endif
 
 //  NOTE(bruno): services that the game layer provides to the platform layer
 //  -----------------------------------------------------------------
 //  -----------------------------------------------------------------
-
-// TODO(bruno): define type aliases like uint64 and int64
-typedef float real32;
-typedef double real64;
 
 struct GameMemory {
 	size_t permanentStorageSize;
@@ -71,7 +77,7 @@ struct GameBackbuffer {
 };
 
 struct GameSoundBuffer {
-	int16_t *samples;
+	int16 *samples;
 	int sampleRate;
 	int sampleCount;
 };
@@ -116,19 +122,15 @@ struct GameControllerInput {
 
 struct GameInput {
 	GameButtonState mouseButtons[5];
-	int32_t mouseX, mouseY, mouseZ;
+	int32 mouseX, mouseY, mouseZ;
 
+	real32 deltaTime;
 	GameControllerInput controllers[MAX_CONTROLLERS + 1];
 };
 
 struct GameState {
 	int toneHz;
-	int xOffset;
-	int yOffset;
 	real32 tsine;
-
-	int playerX;
-	int playerY;
 };
 
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
@@ -143,10 +145,10 @@ inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
 	return controller;
 }
 
-inline u_int32_t safeTruncateUint64(u_int64_t value) {
+inline uint32 safeTruncateUint64(uint64 value) {
 	assert(value <=
 		   0xFFFFFFFF); // TODO(bruno): defines for max values like u_int32_max
-	u_int32_t result = (u_int32_t)value;
+	uint32 result = (uint32)value;
 	return result;
 }
 
