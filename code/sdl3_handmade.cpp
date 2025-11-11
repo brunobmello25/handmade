@@ -195,7 +195,7 @@ void platformWriteMemorySnapshot(void *memory, size_t memorySize, int index) {
 }
 
 bool platformProcessEvents(PlatformBackbuffer *backbuffer,
-						   GameControllerInput *keyboardInput,
+						   GameControllerInput *keyboardInput, GameInput *input,
 						   PlatformState *platformState) {
 
 	SDL_Event event;
@@ -244,6 +244,33 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 					assert(!"Impossible state in input recording/playback");
 				}
 			}
+		}
+		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
+			event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+			bool isDown = (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
+
+			if (event.button.button == SDL_BUTTON_LEFT) {
+				platformProcessKeypress(&input->mouseButtons[0], isDown);
+			}
+			if (event.button.button == SDL_BUTTON_MIDDLE) {
+				platformProcessKeypress(&input->mouseButtons[1], isDown);
+			}
+			if (event.button.button == SDL_BUTTON_RIGHT) {
+				platformProcessKeypress(&input->mouseButtons[2], isDown);
+			}
+			if (event.button.button == SDL_BUTTON_X1) {
+				platformProcessKeypress(&input->mouseButtons[3], isDown);
+			}
+			if (event.button.button == SDL_BUTTON_X2) {
+				platformProcessKeypress(&input->mouseButtons[4], isDown);
+			}
+		}
+		if (event.type == SDL_EVENT_MOUSE_MOTION) {
+			input->mouseX = event.motion.x;
+			input->mouseY = event.motion.y;
+		}
+		if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+			input->mouseZ += (int32_t)event.wheel.y;
 		}
 		if (event.type == SDL_EVENT_WINDOW_RESIZED) {
 			SDL_Window *window = SDL_GetWindowFromEvent(&event);
@@ -765,8 +792,18 @@ int main(void) {
 			newKeyboard->buttons[i].endedDown =
 				oldKeyboard->buttons[i].endedDown;
 		}
+
+		// Preserve mouse button state across frames
+		for (size_t i = 0; i < arraylength(newInput->mouseButtons); i++) {
+			newInput->mouseButtons[i].endedDown =
+				oldInput->mouseButtons[i].endedDown;
+		}
+		newInput->mouseX = oldInput->mouseX;
+		newInput->mouseY = oldInput->mouseY;
+		newInput->mouseZ = oldInput->mouseZ;
+
 		globalRunning = platformProcessEvents(&globalBackbuffer, newKeyboard,
-											  &platformState);
+											  newInput, &platformState);
 
 		GameBackbuffer gamebackbuffer = {};
 		gamebackbuffer.width = globalBackbuffer.width;

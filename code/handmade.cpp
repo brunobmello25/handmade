@@ -147,4 +147,14 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 
 	renderWeirdGradient(backbuffer, gameState->xOffset, gameState->yOffset);
 	renderPlayer(backbuffer, gameState->playerX, gameState->playerY);
+
+	// Render cursor at mouse position
+	renderPlayer(backbuffer, input->mouseX, input->mouseY);
+
+	// Render squares for each mouse button that's pressed
+	for (size_t i = 0; i < arraylength(input->mouseButtons); ++i) {
+		if (input->mouseButtons[i].endedDown) {
+			renderPlayer(backbuffer, 10 + 20 * i, 10);
+		}
+	}
 }

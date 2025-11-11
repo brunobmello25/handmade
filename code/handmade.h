@@ -115,6 +115,9 @@ struct GameControllerInput {
 };
 
 struct GameInput {
+	GameButtonState mouseButtons[5];
+	int32_t mouseX, mouseY, mouseZ;
+
 	GameControllerInput controllers[MAX_CONTROLLERS + 1];
 };
 
