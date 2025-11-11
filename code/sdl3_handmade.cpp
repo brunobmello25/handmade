@@ -115,7 +115,7 @@ void platformStopInputPlayback(PlatformState *platformState) {
 
 void platformRecordInput(PlatformState platformState, GameInput input) {
 	ssize_t bytesToWrite = sizeof(input);
-	u_int8_t *nextByteLocation = (u_int8_t *)&input;
+	uint8 *nextByteLocation = (uint8 *)&input;
 	while (bytesToWrite) {
 		ssize_t bytesWritten = write(platformState.inputRecordingHandle,
 									 nextByteLocation, bytesToWrite);
@@ -134,7 +134,7 @@ void platformReadMemorySnapshot(void *memory, size_t memorySize, int index) {
 		assert(!"Failed to open memory snapshot file for reading");
 	}
 	ssize_t bytesToRead = memorySize;
-	u_int8_t *nextByteLocation = (u_int8_t *)memory;
+	uint8 *nextByteLocation = (uint8 *)memory;
 	while (bytesToRead) {
 		ssize_t bytesRead = read(handle, nextByteLocation, bytesToRead);
 		if (bytesRead == -1) {
@@ -154,7 +154,7 @@ void platformReadMemorySnapshot(void *memory, size_t memorySize, int index) {
 
 void platformPlaybackInput(PlatformState *platformState, GameInput *input) {
 	ssize_t bytesToRead = sizeof(*input);
-	u_int8_t *nextByteLocation = (u_int8_t *)input;
+	uint8 *nextByteLocation = (uint8 *)input;
 	while (bytesToRead) {
 		ssize_t bytesRead = read(platformState->inputPlaybackHandle,
 								 nextByteLocation, bytesToRead);
@@ -185,7 +185,7 @@ void platformWriteMemorySnapshot(void *memory, size_t memorySize, int index) {
 		assert(!"Failed to open memory snapshot file for writing");
 	}
 	ssize_t bytesToWrite = memorySize;
-	u_int8_t *nextByteLocation = (u_int8_t *)memory;
+	uint8 *nextByteLocation = (uint8 *)memory;
 	while (bytesToWrite) {
 		ssize_t bytesWritten = write(handle, nextByteLocation, bytesToWrite);
 		if (bytesWritten == -1) {
@@ -274,7 +274,7 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 			input->mouseY = event.motion.y;
 		}
 		if (event.type == SDL_EVENT_MOUSE_WHEEL) {
-			input->mouseZ += (int32_t)event.wheel.y;
+			input->mouseZ += (int32)event.wheel.y;
 		}
 		if (event.type == SDL_EVENT_WINDOW_RESIZED) {
 			// NOTE(bruno):
@@ -288,11 +288,11 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 
 #if HANDMADE_INTERNAL
 void DEBUGplatformDrawDebugAudioLine(PlatformBackbuffer *buffer, int x, int top,
-									 int bottom, uint32_t color) {
+									 int bottom, uint32 color) {
 	if (x < 0 || x >= buffer->width)
 		return;
 
-	uint32_t *pixel = (uint32_t *)buffer->memory;
+	uint32 *pixel = (uint32 *)buffer->memory;
 	for (int y = top; y < bottom && y < buffer->height; y++) {
 		pixel[y * buffer->width + x] = color;
 	}
@@ -303,7 +303,7 @@ void DEBUGPlatformDrawDebugAudio(GameSoundBuffer *gameSoundBuffer) {
 	// Shows audio buffer state before we update the window
 	int debugQueued = SDL_GetAudioStreamQueued(globalAudioOutput.stream);
 	int debugQueuedSamples =
-		debugQueued / (globalAudioOutput.numChannels * sizeof(int16_t));
+		debugQueued / (globalAudioOutput.numChannels * sizeof(int16));
 	int targetQueuedSamples = (globalAudioOutput.sampleRate / 30) * 2;
 
 	// Draw a visual representation at the top of the screen
@@ -370,7 +370,7 @@ DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename) {
 	}
 
 	ssize_t bytesToRead = result.size;
-	u_int8_t *nextByteLocation = (u_int8_t *)result.data;
+	uint8 *nextByteLocation = (uint8 *)result.data;
 	while (bytesToRead) {
 		ssize_t bytesRead = read(handle, nextByteLocation, bytesToRead);
 		if (bytesRead == -1) {
@@ -391,7 +391,7 @@ DEBUGReadFileResult DEBUGPlatformReadEntireFile(const char *filename) {
 
 void DEBUGPlatformFreeFileMemory(void *memory) { free(memory); }
 
-bool DEBUGPlatformWriteEntireFile(const char *filename, u_int32_t size,
+bool DEBUGPlatformWriteEntireFile(const char *filename, uint32 size,
 								  void *memory) {
 	int handle = open(filename, O_WRONLY | O_CREAT,
 					  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -401,7 +401,7 @@ bool DEBUGPlatformWriteEntireFile(const char *filename, u_int32_t size,
 	}
 
 	ssize_t bytesToWrite = size;
-	u_int8_t *nextByteLocation = (u_int8_t *)memory;
+	uint8 *nextByteLocation = (uint8 *)memory;
 	while (bytesToWrite) {
 		ssize_t bytesWritten = write(handle, nextByteLocation, bytesToWrite);
 		if (bytesWritten == -1) {
@@ -533,8 +533,8 @@ void platformProcessControllers(GameInput *gameInput) {
 		processControllerButton(&oldController->moveRight,
 								&newController->moveRight, dpadRight);
 
-		int16_t sdlStickX = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
-		int16_t sdlStickY = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY);
+		int16 sdlStickX = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
+		int16 sdlStickY = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY);
 		real32 stickX;
 		if (sdlStickX < 0) {
 			stickX = (real32)sdlStickX / 32768.0f;
@@ -578,9 +578,9 @@ void platformProcessControllers(GameInput *gameInput) {
 	}
 }
 
-int platformGetSamplesToGenerate(int64_t frameStart, int64_t lastFrameStart) {
+int platformGetSamplesToGenerate(int64 frameStart, int64 lastFrameStart) {
 	// Always generate audio based on elapsed time
-	u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
+	uint64 perfFrequency = SDL_GetPerformanceFrequency();
 	real64 secondsElapsed =
 		(real64)(frameStart - lastFrameStart) / (real64)perfFrequency;
 
@@ -602,7 +602,7 @@ bool platformShouldQueueAudioSamples() {
 	// accumulation)
 	int queued = SDL_GetAudioStreamQueued(globalAudioOutput.stream);
 	int queuedSamples =
-		queued / (globalAudioOutput.numChannels * sizeof(int16_t));
+		queued / (globalAudioOutput.numChannels * sizeof(int16));
 	// Target: keep about 2-3 frames worth queued (~66ms at 30fps = safe
 	// buffer)
 	int targetQueuedSamples = (globalAudioOutput.sampleRate / 30) * 2;
@@ -634,7 +634,7 @@ bool platformInitializeGameMemory(GameMemory *gameMemory,
 
 	gameMemory->permanentStorage = memory;
 	gameMemory->transientStorage =
-		(void *)((uint8_t *)memory + gameMemory->permanentStorageSize);
+		(void *)((uint8 *)memory + gameMemory->permanentStorageSize);
 
 	gameMemory->DEBUGPlatformReadEntireFile = &DEBUGPlatformReadEntireFile;
 	gameMemory->DEBUGPlatformFreeFileMemory = &DEBUGPlatformFreeFileMemory;
@@ -652,7 +652,7 @@ void platformOutputSound(PlatformAudioOutput *audioOutput,
 	if (!gameSoundBuffer->samples || gameSoundBuffer->sampleCount == 0)
 		return;
 	// Push audio data to the stream
-	int bytesPerSample = audioOutput->numChannels * sizeof(int16_t);
+	int bytesPerSample = audioOutput->numChannels * sizeof(int16);
 	int bytesToWrite = gameSoundBuffer->sampleCount * bytesPerSample;
 	SDL_PutAudioStreamData(audioOutput->stream, gameSoundBuffer->samples,
 						   bytesToWrite);
@@ -675,20 +675,19 @@ int platformGetDisplayRefreshRate(SDL_Window *window) {
 	return mode->refresh_rate;
 }
 
-real32 platformGetSecondsElapsed(int64_t oldCounter, int64_t currentCounter) {
+real32 platformGetSecondsElapsed(int64 oldCounter, int64 currentCounter) {
 	return ((real32)(currentCounter - oldCounter) /
 			(real32)SDL_GetPerformanceFrequency());
 }
 
-inline void platformDelayFrame(int64_t frameStart,
-							   real32 targetSecondsPerFrame) {
+inline void platformDelayFrame(int64 frameStart, real32 targetSecondsPerFrame) {
 
 	real32 secondsElapsed =
 		platformGetSecondsElapsed(frameStart, SDL_GetPerformanceCounter());
 
 	if (secondsElapsed < targetSecondsPerFrame) {
-		u_int32_t msToSleep =
-			(u_int32_t)((targetSecondsPerFrame - secondsElapsed) * 1000.0f);
+		uint32 msToSleep =
+			(uint32)((targetSecondsPerFrame - secondsElapsed) * 1000.0f);
 		if (msToSleep > 0) {
 			SDL_Delay(msToSleep);
 		}
@@ -778,7 +777,7 @@ int main(void) {
 	platformResizeBackbuffer(&globalBackbuffer, renderer, initialWidth,
 							 initialHeight);
 
-	int64_t lastFrameStart = SDL_GetPerformanceCounter();
+	int64 lastFrameStart = SDL_GetPerformanceCounter();
 
 	PlatformGameCode gameCode = {};
 	platformLoadGameCode(&gameCode);
@@ -790,10 +789,10 @@ int main(void) {
 			platformLoadGameCode(&gameCode);
 		}
 
-		int64_t frameStart = SDL_GetPerformanceCounter();
+		int64 frameStart = SDL_GetPerformanceCounter();
 
 #if HANDMADE_PLATFORMDEBUG
-		uint64_t startCyclesCount = _rdtsc();
+		uint64 startCyclesCount = _rdtsc();
 #endif
 
 		platformProcessControllers(newInput);
@@ -832,7 +831,7 @@ int main(void) {
 
 		// Only generate audio if we're actually going to use it
 		GameSoundBuffer gameSoundBuffer = {};
-		int16_t samples[48000 * 2]; // TODO(bruno): 1 second max buffer.
+		int16 samples[48000 * 2]; // TODO(bruno): 1 second max buffer.
 		if (platformShouldQueueAudioSamples()) {
 			// make this dynamic later
 			gameSoundBuffer.sampleCount =
@@ -863,16 +862,16 @@ int main(void) {
 		lastFrameStart = frameStart;
 
 #if HANDMADE_PLATFORMDEBUG
-		int64_t frameEnd = SDL_GetPerformanceCounter();
-		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
-		int64_t frameDuration = frameEnd - frameStart;
+		int64 frameEnd = SDL_GetPerformanceCounter();
+		uint64 perfFrequency = SDL_GetPerformanceFrequency();
+		int64 frameDuration = frameEnd - frameStart;
 		real64 fps = (real64)perfFrequency / (real64)frameDuration;
 		// Recalculate queue for debug display
 		int queued = SDL_GetAudioStreamQueued(globalAudioOutput.stream);
 		int queuedSamples =
-			queued / (globalAudioOutput.numChannels * sizeof(int16_t));
-		u_int64_t endCyclesCount = _rdtsc();
-		u_int64_t cyclesElapsed = endCyclesCount - startCyclesCount;
+			queued / (globalAudioOutput.numChannels * sizeof(int16));
+		uint64 endCyclesCount = _rdtsc();
+		uint64 cyclesElapsed = endCyclesCount - startCyclesCount;
 		real64 queuedSeconds =
 			(real64)queuedSamples / (real64)globalAudioOutput.sampleRate;
 		real64 msPerFrame =

@@ -12,9 +12,8 @@ void renderPlayer(GameBackbuffer *buffer, int playerX, int playerY) {
 			// Bounds checking
 			if (pixelX >= 0 && pixelX < buffer->width && pixelY >= 0 &&
 				pixelY < buffer->height) {
-				uint8_t *row =
-					(uint8_t *)buffer->memory + (pixelY * buffer->pitch);
-				uint32_t *pixel = (uint32_t *)row + pixelX;
+				uint8 *row = (uint8 *)buffer->memory + (pixelY * buffer->pitch);
+				uint32 *pixel = (uint32 *)row + pixelX;
 				*pixel = 0xFFFFFFFF; // White color (ARGB)
 			}
 		}
@@ -27,7 +26,7 @@ void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 
 	int wavePeriod = soundBuffer->sampleRate / gameState->toneHz;
 
-	int16_t *sampleOut = soundBuffer->samples;
+	int16 *sampleOut = soundBuffer->samples;
 
 	for (int i = 0; i < soundBuffer->sampleCount; i++) {
 		// TODO(bruno): ditch this compile-time flag once we stop debugging
@@ -35,9 +34,9 @@ void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 #if ENABLE_SINE_WAVE
 		int toneVolume = 3000;
 		real32 sineValue = sinf(gameState->tsine);
-		int16_t sampleValue = (int16_t)(sineValue * toneVolume);
+		int16 sampleValue = (int16)(sineValue * toneVolume);
 #else
-		int16_t sampleValue = 0;
+		int16 sampleValue = 0;
 #endif
 		*sampleOut++ = sampleValue;
 		*sampleOut++ = sampleValue;
