@@ -46,8 +46,8 @@ global_variable PlatformAudioOutput globalAudioOutput;
 
 global_variable SDL_Gamepad *GamepadHandles[MAX_CONTROLLERS] = {};
 
-// function that gets called everytime the window size changes, and also
-// at first time, in order to allocate the backbuffer with proper dimensions
+// function that gets called once at startup to allocate the backbuffer
+// with fixed dimensions
 void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 							  SDL_Renderer *renderer, int width, int height) {
 	int bytesPerPixel = sizeof(int);
@@ -277,17 +277,10 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 			input->mouseZ += (int32_t)event.wheel.y;
 		}
 		if (event.type == SDL_EVENT_WINDOW_RESIZED) {
-			SDL_Window *window = SDL_GetWindowFromEvent(&event);
-
-			if (!window)
-				return false; // TODO(bruno): proper error handling
-
-			SDL_Renderer *renderer = SDL_GetRenderer(window);
-			if (!renderer)
-				return false; // TODO(bruno): proper error handling
-
-			platformResizeBackbuffer(backbuffer, renderer, event.window.data1,
-									 event.window.data2);
+			// NOTE(bruno):
+			// Allow window to resize, but don't resize the backbuffer
+			// The fixed 960x540 buffer will be rendered at 0,0 with black
+			// borders or cropped if the window is smaller
 		}
 	}
 	return true;
@@ -428,7 +421,13 @@ bool DEBUGPlatformWriteEntireFile(const char *filename, u_int32_t size,
 void platformUpdateWindow(PlatformBackbuffer *buffer, SDL_Window *window,
 						  SDL_Renderer *renderer) {
 	SDL_UpdateTexture(buffer->texture, NULL, buffer->memory, buffer->pitch);
-	SDL_RenderTexture(renderer, buffer->texture, 0, 0);
+
+	// Render the fixed 960x540 buffer at 0,0
+	// If window is larger, there will be black borders on right/bottom
+	// If window is smaller, the content will be cropped
+	SDL_FRect destRect = {0, 0, (float)buffer->width, (float)buffer->height};
+	SDL_RenderTexture(renderer, buffer->texture, NULL, &destRect);
+
 	SDL_RenderPresent(renderer);
 }
 
@@ -735,8 +734,8 @@ bool platformLoadGameCode(PlatformGameCode *platformGameCode) {
 }
 
 int main(void) {
-	int initialWidth = 1920 / 2;
-	int initialHeight = 1080 / 2;
+	int initialWidth = 960;
+	int initialHeight = 540;
 
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD |
 				  SDL_INIT_AUDIO))
@@ -758,7 +757,7 @@ int main(void) {
 		printf("Failed to set vsync on renderer: %s\n", SDL_GetError());
 	}
 
-	int refreshRate = platformGetDisplayRefreshRate(window);
+	int refreshRate = 30;
 	real32 targetSecondsPerFrame =
 		1.0f / (real32)refreshRate; // TODO(bruno): change the game refresh rate
 									// based on the hardware capacity: if it's
