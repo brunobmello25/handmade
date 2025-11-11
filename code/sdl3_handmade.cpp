@@ -791,7 +791,10 @@ int main(void) {
 		}
 
 		int64_t frameStart = SDL_GetPerformanceCounter();
+
+#if HANDMADE_PLATFORMDEBUG
 		uint64_t startCyclesCount = _rdtsc();
+#endif
 
 		platformProcessControllers(newInput);
 		GameInput *temp = oldInput;
@@ -857,26 +860,23 @@ int main(void) {
 
 		platformDelayFrame(frameStart, targetSecondsPerFrame);
 
+		lastFrameStart = frameStart;
+
+#if HANDMADE_PLATFORMDEBUG
 		int64_t frameEnd = SDL_GetPerformanceCounter();
 		u_int64_t perfFrequency = SDL_GetPerformanceFrequency();
 		int64_t frameDuration = frameEnd - frameStart;
-		real64 msPerFrame =
-			((real64)frameDuration * 1000) / (real64)perfFrequency;
 		real64 fps = (real64)perfFrequency / (real64)frameDuration;
-
 		// Recalculate queue for debug display
 		int queued = SDL_GetAudioStreamQueued(globalAudioOutput.stream);
 		int queuedSamples =
 			queued / (globalAudioOutput.numChannels * sizeof(int16_t));
-		real64 queuedSeconds =
-			(real64)queuedSamples / (real64)globalAudioOutput.sampleRate;
-
-		lastFrameStart = frameStart;
-
 		u_int64_t endCyclesCount = _rdtsc();
 		u_int64_t cyclesElapsed = endCyclesCount - startCyclesCount;
-
-#if HANDMADE_PLATFORMDEBUG
+		real64 queuedSeconds =
+			(real64)queuedSamples / (real64)globalAudioOutput.sampleRate;
+		real64 msPerFrame =
+			((real64)frameDuration * 1000) / (real64)perfFrequency;
 		printf("ms/frame: %.02f  fps: %.02f  MegaCycles/frame: %lu  Audio "
 			   "queued: %.3fs\n",
 			   msPerFrame, fps, cyclesElapsed / (1000 * 1000), queuedSeconds);

@@ -124,8 +124,6 @@ struct GameInput {
 
 struct GameState {
 	int toneHz;
-	int xOffset;
-	int yOffset;
 	real32 tsine;
 
 	int playerX;
