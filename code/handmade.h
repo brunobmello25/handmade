@@ -131,9 +131,6 @@ struct GameInput {
 struct GameState {
 	int toneHz;
 	real32 tsine;
-
-	int playerX;
-	int playerY;
 };
 
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
