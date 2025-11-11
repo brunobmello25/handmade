@@ -783,6 +783,8 @@ int main(void) {
 		GameInput *temp = oldInput;
 		oldInput = newInput;
 		newInput = temp;
+		newInput->deltaTime = targetSecondsPerFrame; // TODO(bruno): calculate
+													 // real delta time
 
 		GameControllerInput *oldKeyboard = &oldInput->controllers[0];
 		GameControllerInput *newKeyboard = &newInput->controllers[0];

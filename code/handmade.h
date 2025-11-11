@@ -118,6 +118,7 @@ struct GameInput {
 	GameButtonState mouseButtons[5];
 	int32_t mouseX, mouseY, mouseZ;
 
+	real32 deltaTime;
 	GameControllerInput controllers[MAX_CONTROLLERS + 1];
 };
 
