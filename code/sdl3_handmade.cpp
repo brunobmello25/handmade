@@ -34,6 +34,10 @@
 #define INPUT_SNAPSHOT_PATH "snapshots/handmade.hmi"
 #define MEMORY_SNAPSHOT_PATH "snapshots/handmade.hms"
 
+#ifndef GAME_LIB_PATH
+#define GAME_LIB_PATH "handmade.so"
+#endif
+
 global_variable bool globalRunning;
 
 global_variable PlatformBackbuffer globalBackbuffer;
@@ -692,6 +696,14 @@ inline void platformDelayFrame(int64_t frameStart,
 	}
 }
 
+time_t platformGetFileModTime(const char *filename) {
+	struct stat fileStatus;
+	if (stat(filename, &fileStatus) == 0) {
+		return fileStatus.st_mtime;
+	}
+	return 0;
+}
+
 void platformUnloadGameCode(PlatformGameCode *platformGameCode) {
 	if (platformGameCode->loaded) {
 		dlclose(platformGameCode->gameLib);
@@ -702,9 +714,8 @@ void platformUnloadGameCode(PlatformGameCode *platformGameCode) {
 }
 
 bool platformLoadGameCode(PlatformGameCode *platformGameCode) {
-#ifndef GAME_LIB_PATH
-#define GAME_LIB_PATH "handmade.so"
-#endif
+	platformGameCode->lastModTime = platformGetFileModTime(GAME_LIB_PATH);
+
 	platformGameCode->gameLib = dlopen(GAME_LIB_PATH, RTLD_LAZY);
 	if (!platformGameCode->gameLib)
 		return false;
@@ -771,10 +782,14 @@ int main(void) {
 	int64_t lastFrameStart = SDL_GetPerformanceCounter();
 
 	PlatformGameCode gameCode = {};
+	platformLoadGameCode(&gameCode);
 
 	while (globalRunning) {
-		platformUnloadGameCode(&gameCode);
-		platformLoadGameCode(&gameCode);
+		time_t newModTime = platformGetFileModTime(GAME_LIB_PATH);
+		if (newModTime != gameCode.lastModTime) {
+			platformUnloadGameCode(&gameCode);
+			platformLoadGameCode(&gameCode);
+		}
 
 		int64_t frameStart = SDL_GetPerformanceCounter();
 		uint64_t startCyclesCount = _rdtsc();

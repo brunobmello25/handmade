@@ -21,6 +21,7 @@ struct PlatformAudioOutput {
 struct PlatformGameCode {
 	void *gameLib;
 	GAME_UPDATE_AND_RENDER gameUpdateAndRender;
+	time_t lastModTime;
 	bool loaded;
 };
 
