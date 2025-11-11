@@ -35,7 +35,7 @@ fi
 mkdir -p ./target
 pushd ./target/
 
-COMMON_FLAGS="-DENABLE_SINE_WAVE=0 -DHANDMADE_PRINTDEBUG=0 -DHANDMADE_SLOW=1 -DHANDMADE_INTERNAL=1 -DGAME_LIB_PATH=\"./target/handmade.so\" -g -Wall -Wno-unused-variable -Wno-write-strings -Werror -fno-rtti -fno-exceptions"
+COMMON_FLAGS="-DENABLE_SINE_WAVE=0 -DHANDMADE_PLATFORMDEBUG=0 -DHANDMADE_SLOW=1 -DHANDMADE_INTERNAL=1 -DGAME_LIB_PATH=\"./target/handmade.so\" -g -Wall -Wno-unused-variable -Wno-write-strings -Werror -fno-rtti -fno-exceptions"
 
 # Always compile the game code (fast)
 echo "Compiling game code..."

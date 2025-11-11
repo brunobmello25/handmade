@@ -850,7 +850,7 @@ int main(void) {
 									 &gameSoundBuffer, newInput);
 		platformOutputSound(&globalAudioOutput, &gameSoundBuffer);
 
-#if HANDMADE_INTERNAL
+#if HANDMADE_PLATFORMDEBUG
 		DEBUGPlatformDrawDebugAudio(&gameSoundBuffer);
 #endif
 
@@ -877,7 +877,7 @@ int main(void) {
 		u_int64_t endCyclesCount = _rdtsc();
 		u_int64_t cyclesElapsed = endCyclesCount - startCyclesCount;
 
-#if HANDMADE_PRINTDEBUG
+#if HANDMADE_PLATFORMDEBUG
 		printf("ms/frame: %.02f  fps: %.02f  MegaCycles/frame: %lu  Audio "
 			   "queued: %.3fs\n",
 			   msPerFrame, fps, cyclesElapsed / (1000 * 1000), queuedSeconds);
