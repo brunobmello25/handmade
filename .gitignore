@@ -3,6 +3,7 @@ target
 .idea
 handmade
 core.*
+cmake-build-debug
 
 *.hmi
 *.hms
