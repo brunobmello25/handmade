@@ -444,7 +444,12 @@ void platformUpdateWindow(PlatformBackbuffer *buffer, SDL_Window *window,
 	// Render the fixed 960x540 buffer at 0,0
 	// If window is larger, there will be black borders on right/bottom
 	// If window is smaller, the content will be cropped
-	SDL_FRect destRect = {0, 0, (float)buffer->width, (float)buffer->height};
+
+	real32 offsetX = 0.0f;
+	real32 offsetY = 0.0f;
+
+	SDL_FRect destRect = {offsetX, offsetY, (float)buffer->width,
+						  (float)buffer->height};
 	SDL_RenderTexture(renderer, buffer->texture, NULL, &destRect);
 
 	SDL_RenderPresent(renderer);

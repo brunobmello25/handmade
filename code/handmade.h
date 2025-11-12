@@ -134,6 +134,17 @@ struct GameState {
 	real32 playerY;
 };
 
+struct Tilemap {
+	real32 upperLeftX;
+	real32 upperLeftY;
+	real32 tileWidth;
+	real32 tileHeight;
+	int32 width;
+	int32 height;
+
+	uint32 *tiles;
+};
+
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
 	assert(index >= 0 && index < arraylength(input->controllers));
 
