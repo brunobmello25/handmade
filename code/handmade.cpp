@@ -94,31 +94,47 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 
 #define TILEMAP_WIDTH 16
 #define TILEMAP_HEIGHT 9
-	Tilemap tilemap = {};
-	tilemap.width = TILEMAP_WIDTH;
-	tilemap.height = TILEMAP_HEIGHT;
-	tilemap.upperLeftX = 0.0f;
-	tilemap.upperLeftY = 0.0f;
-	tilemap.tileWidth = 60.0f;
-	tilemap.tileHeight = 60.0f;
-	uint32 tiles[TILEMAP_HEIGHT][TILEMAP_WIDTH] = {
+	uint32 tiles0[TILEMAP_HEIGHT][TILEMAP_WIDTH] = {
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1},
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1},
+	};
+	uint32 tiles1[TILEMAP_HEIGHT][TILEMAP_WIDTH] = {
+		{1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	};
-	tilemap.tiles = (uint32 *)tiles;
+
+	Tilemap tilemaps[2] = {};
+	tilemaps[0].width = TILEMAP_WIDTH;
+	tilemaps[0].height = TILEMAP_HEIGHT;
+	tilemaps[0].upperLeftX = 0.0f;
+	tilemaps[0].upperLeftY = 0.0f;
+	tilemaps[0].tileWidth = 60.0f;
+	tilemaps[0].tileHeight = 60.0f;
+
+	tilemaps[1] = tilemaps[0];
+
+	tilemaps[0].tiles = (uint32 *)tiles0;
+	tilemaps[1].tiles = (uint32 *)tiles1;
 
 	real32 playerR = 0.0f;
 	real32 playerG = 1.0f;
 	real32 playerB = 1.0f;
-	real32 playerWidth = 0.75f * tilemap.tileWidth;
-	real32 playerHeight = 0.75f * tilemap.tileHeight;
+	real32 playerWidth = 0.75f * tilemaps[0].tileWidth;
+	real32 playerHeight = 0.75f * tilemaps[0].tileHeight;
 
 	GameState *gameState = (GameState *)gameMemory->permanentStorage;
 	if (!gameMemory->isInitialized) {
@@ -147,11 +163,11 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			real32 newPlayerX = gameState->playerX + dPlayerX;
 			real32 newPlayerY = gameState->playerY + dPlayerY;
 
-			if (isTilemapPointEmpty(&tilemap, newPlayerX, newPlayerY) &&
-				isTilemapPointEmpty(&tilemap, newPlayerX - (playerWidth / 2),
-									newPlayerY) &&
-				isTilemapPointEmpty(&tilemap, newPlayerX + (playerWidth / 2),
-									newPlayerY)) {
+			if (isTilemapPointEmpty(&tilemaps[0], newPlayerX, newPlayerY) &&
+				isTilemapPointEmpty(
+					&tilemaps[0], newPlayerX - (playerWidth / 2), newPlayerY) &&
+				isTilemapPointEmpty(
+					&tilemaps[0], newPlayerX + (playerWidth / 2), newPlayerY)) {
 				gameState->playerX = newPlayerX;
 				gameState->playerY = newPlayerY;
 			}
@@ -167,15 +183,15 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 
 	for (int row = 0; row < 9; row++) {
 		for (int col = 0; col < 16; col++) {
-			uint32 tileID = tilemap.tiles[row * tilemap.width + col];
+			uint32 tileID = tilemaps[0].tiles[row * tilemaps[0].width + col];
 			real32 gray = 0.5f;
 			if (tileID == 1) {
 				gray = 1.0f;
 			}
-			real32 minX = tilemap.upperLeftX + col * tilemap.tileWidth;
-			real32 minY = tilemap.upperLeftY + row * tilemap.tileHeight;
-			real32 maxX = minX + tilemap.tileWidth;
-			real32 maxY = minY + tilemap.tileHeight;
+			real32 minX = tilemaps[0].upperLeftX + col * tilemaps[0].tileWidth;
+			real32 minY = tilemaps[0].upperLeftY + row * tilemaps[0].tileHeight;
+			real32 maxX = minX + tilemaps[0].tileWidth;
+			real32 maxY = minY + tilemaps[0].tileHeight;
 			renderRectangle(backbuffer, minX, minY, maxX, maxY, gray, gray,
 							gray);
 		}
