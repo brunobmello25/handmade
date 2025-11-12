@@ -52,11 +52,9 @@ void platformResizeBackbuffer(PlatformBackbuffer *backbuffer,
 							  SDL_Renderer *renderer, int width, int height) {
 	int bytesPerPixel = sizeof(int);
 
-	if (backbuffer->memory)
-		free(backbuffer->memory);
+	if (backbuffer->memory) free(backbuffer->memory);
 
-	if (backbuffer->texture)
-		SDL_DestroyTexture(backbuffer->texture);
+	if (backbuffer->texture) SDL_DestroyTexture(backbuffer->texture);
 
 	backbuffer->width = width;
 	backbuffer->height = height;
@@ -111,6 +109,22 @@ void platformStopInputPlayback(PlatformState *platformState) {
 
 	close(platformState->inputPlaybackHandle);
 	platformState->inputPlayingIndex = 0;
+}
+
+void platformClearInputButtonStates(GameInput *input) {
+	for (size_t i = 0; i < arraylength(input->controllers); i++) {
+		GameControllerInput *controller = &input->controllers[i];
+
+		for (size_t i = 0; i < arraylength(controller->buttons); i++) {
+			controller->buttons[i].endedDown = false;
+			controller->buttons[i].halfTransitionCount = 0;
+		}
+	}
+
+	for (size_t i = 0; i < arraylength(input->mouseButtons); i++) {
+		input->mouseButtons[i].endedDown = false;
+		input->mouseButtons[i].halfTransitionCount = 0;
+	}
 }
 
 void platformRecordInput(PlatformState platformState, GameInput input) {
@@ -210,22 +224,22 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 		if (event.type == SDL_EVENT_KEY_UP ||
 			event.type == SDL_EVENT_KEY_DOWN) {
 			// TODO(bruno): handle key wasdown and isdown
-			if (event.key.key == SDLK_ESCAPE)
-				return false;
+			if (event.key.key == SDLK_ESCAPE) return false;
 
-			if (event.key.repeat)
-				continue;
+			if (event.key.repeat) continue;
 
 			bool isDown = (event.type == SDL_EVENT_KEY_DOWN);
 
-			if (event.key.key == SDLK_W)
-				platformProcessKeypress(&keyboardInput->moveUp, isDown);
-			if (event.key.key == SDLK_A)
-				platformProcessKeypress(&keyboardInput->moveLeft, isDown);
-			if (event.key.key == SDLK_S)
-				platformProcessKeypress(&keyboardInput->moveDown, isDown);
-			if (event.key.key == SDLK_D)
-				platformProcessKeypress(&keyboardInput->moveRight, isDown);
+			if (!platformState->inputPlayingIndex) {
+				if (event.key.key == SDLK_W)
+					platformProcessKeypress(&keyboardInput->moveUp, isDown);
+				if (event.key.key == SDLK_A)
+					platformProcessKeypress(&keyboardInput->moveLeft, isDown);
+				if (event.key.key == SDLK_S)
+					platformProcessKeypress(&keyboardInput->moveDown, isDown);
+				if (event.key.key == SDLK_D)
+					platformProcessKeypress(&keyboardInput->moveRight, isDown);
+			}
 
 			if (event.key.key == SDLK_L && isDown) {
 				if (!platformState->inputRecordingIndex &&
@@ -240,8 +254,10 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 						platformState->gamePermanentStorage,
 						platformState->permanentStorageSize, 1);
 					platformStartInputPlayback(platformState, 1);
+					platformClearInputButtonStates(input);
 				} else if (platformState->inputPlayingIndex) {
 					platformStopInputPlayback(platformState);
+					platformClearInputButtonStates(input);
 				} else {
 					// TODO(bruno): probably want to handle multiple playback
 					// indexes here
@@ -251,6 +267,8 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 		}
 		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
 			event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+			if (platformState->inputPlayingIndex) continue;
+
 			bool isDown = (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
 
 			if (event.button.button == SDL_BUTTON_LEFT) {
@@ -270,10 +288,12 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 			}
 		}
 		if (event.type == SDL_EVENT_MOUSE_MOTION) {
+			if (platformState->inputPlayingIndex) continue;
 			input->mouseX = event.motion.x;
 			input->mouseY = event.motion.y;
 		}
 		if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+			if (platformState->inputPlayingIndex) continue;
 			input->mouseZ += (int32)event.wheel.y;
 		}
 		if (event.type == SDL_EVENT_WINDOW_RESIZED) {
@@ -289,8 +309,7 @@ bool platformProcessEvents(PlatformBackbuffer *backbuffer,
 #if HANDMADE_INTERNAL
 void DEBUGplatformDrawDebugAudioLine(PlatformBackbuffer *buffer, int x, int top,
 									 int bottom, uint32 color) {
-	if (x < 0 || x >= buffer->width)
-		return;
+	if (x < 0 || x >= buffer->width) return;
 
 	uint32 *pixel = (uint32 *)buffer->memory;
 	for (int y = top; y < bottom && y < buffer->height; y++) {
@@ -649,8 +668,7 @@ bool platformInitializeGameMemory(GameMemory *gameMemory,
 
 void platformOutputSound(PlatformAudioOutput *audioOutput,
 						 GameSoundBuffer *gameSoundBuffer) {
-	if (!gameSoundBuffer->samples || gameSoundBuffer->sampleCount == 0)
-		return;
+	if (!gameSoundBuffer->samples || gameSoundBuffer->sampleCount == 0) return;
 	// Push audio data to the stream
 	int bytesPerSample = audioOutput->numChannels * sizeof(int16);
 	int bytesToWrite = gameSoundBuffer->sampleCount * bytesPerSample;
@@ -715,8 +733,7 @@ bool platformLoadGameCode(PlatformGameCode *platformGameCode) {
 	platformGameCode->lastModTime = platformGetFileModTime(GAME_LIB_PATH);
 
 	platformGameCode->gameLib = dlopen(GAME_LIB_PATH, RTLD_LAZY);
-	if (!platformGameCode->gameLib)
-		return false;
+	if (!platformGameCode->gameLib) return false;
 
 	platformGameCode->gameUpdateAndRender = (GAME_UPDATE_AND_RENDER)dlsym(
 		platformGameCode->gameLib, "gameUpdateAndRender");
