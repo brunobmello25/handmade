@@ -145,6 +145,13 @@ struct Tilemap {
 	uint32 *tiles;
 };
 
+struct World {
+	Tilemap *tilemaps;
+
+	int32 width;
+	int32 height;
+};
+
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
 	assert(index >= 0 && index < arraylength(input->controllers));
 

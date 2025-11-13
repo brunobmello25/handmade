@@ -66,8 +66,16 @@ void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 	}
 }
 
-uint32 getTileUnchecked(Tilemap tilemap, uint32 x, uint32 y) {
-	return tilemap.tiles[y * tilemap.width + x];
+uint32 getTileUnchecked(Tilemap *tilemap, uint32 x, uint32 y) {
+	assert(x < tilemap->width);
+	assert(y < tilemap->height);
+	return tilemap->tiles[y * tilemap->width + x];
+}
+
+Tilemap *getTilemap(World *world, uint32 x, uint32 y) {
+	assert(x < world->width);
+	assert(y < world->height);
+	return &world->tilemaps[y * world->width + x];
 }
 
 bool isTilemapPointEmpty(Tilemap *tilemap, real32 testX, real32 testY) {
@@ -80,13 +88,18 @@ bool isTilemapPointEmpty(Tilemap *tilemap, real32 testX, real32 testY) {
 
 	if (testTileX >= 0 && testTileX < tilemap->width && testTileY >= 0 &&
 		testTileY < tilemap->height) {
-		uint32 tileID = getTileUnchecked(*tilemap, testTileX, testTileY);
+		uint32 tileID = getTileUnchecked(tilemap, testTileX, testTileY);
 		if (tileID == 0) {
 			empty = true;
 		}
 	}
 
 	return empty;
+}
+
+bool isWorldPointEmpty(World *world, real32 testX, real32 testY) {
+	assert(!"Not implemented yet");
+	return false;
 }
 
 void renderPlayer(GameBackbuffer *backbuffer, GameState *gameState,
@@ -98,49 +111,77 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 
 #define TILEMAP_WIDTH 16
 #define TILEMAP_HEIGHT 9
-	uint32 tiles0[TILEMAP_HEIGHT][TILEMAP_WIDTH] = {
+	uint32 tiles00[TILEMAP_HEIGHT][TILEMAP_WIDTH] = {
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1},
 	};
-	uint32 tiles1[TILEMAP_HEIGHT][TILEMAP_WIDTH] = {
+	uint32 tiles01[TILEMAP_HEIGHT][TILEMAP_WIDTH] = {
 		{1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	};
+	uint32 tiles10[TILEMAP_HEIGHT][TILEMAP_WIDTH] = {
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1},
+	};
+	uint32 tiles11[TILEMAP_HEIGHT][TILEMAP_WIDTH] = {
+		{1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	};
 
-	Tilemap tilemaps[2] = {};
-	tilemaps[0].width = TILEMAP_WIDTH;
-	tilemaps[0].height = TILEMAP_HEIGHT;
-	tilemaps[0].upperLeftX = 0.0f;
-	tilemaps[0].upperLeftY = 0.0f;
-	tilemaps[0].tileWidth = 60.0f;
-	tilemaps[0].tileHeight = 60.0f;
+	Tilemap tilemaps[2][2] = {};
+	tilemaps[0][0].width = TILEMAP_WIDTH;
+	tilemaps[0][0].height = TILEMAP_HEIGHT;
+	tilemaps[0][0].upperLeftX = 0.0f;
+	tilemaps[0][0].upperLeftY = 0.0f;
+	tilemaps[0][0].tileWidth = 60.0f;
+	tilemaps[0][0].tileHeight = 60.0f;
+	tilemaps[0][1] = tilemaps[0][0];
+	tilemaps[1][0] = tilemaps[0][0];
+	tilemaps[1][1] = tilemaps[0][0];
 
-	tilemaps[1] = tilemaps[0];
+	tilemaps[0][0].tiles = (uint32 *)tiles00;
+	tilemaps[0][1].tiles = (uint32 *)tiles01;
+	tilemaps[1][0].tiles = (uint32 *)tiles10;
+	tilemaps[1][1].tiles = (uint32 *)tiles11;
 
-	tilemaps[0].tiles = (uint32 *)tiles0;
-	tilemaps[1].tiles = (uint32 *)tiles1;
+	Tilemap tilemap = tilemaps[0][0];
+
+	World world = {};
+	world.tilemaps = (Tilemap *)tilemaps;
 
 	real32 playerR = 0.0f;
 	real32 playerG = 1.0f;
 	real32 playerB = 1.0f;
-	real32 playerWidth = 0.75f * tilemaps[0].tileWidth;
-	real32 playerHeight = 0.75f * tilemaps[0].tileHeight;
-
-	Tilemap tilemap = tilemaps[0];
+	real32 playerWidth = 0.75f * tilemap.tileWidth;
+	real32 playerHeight = 0.75f * tilemap.tileHeight;
 
 	GameState *gameState = (GameState *)gameMemory->permanentStorage;
 	if (!gameMemory->isInitialized) {
@@ -190,7 +231,7 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	for (int32 tileY = 0; tileY < tilemap.height; tileY++) {
 		for (int32 tileX = 0; tileX < tilemap.width; tileX++) {
 
-			uint32 tileID = getTileUnchecked(tilemap, tileX, tileY);
+			uint32 tileID = getTileUnchecked(&tilemap, tileX, tileY);
 			real32 gray = 0.5f;
 			if (tileID == 1) {
 				gray = 1.0f;
