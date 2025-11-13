@@ -66,29 +66,31 @@ void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 	}
 }
 
-uint32 getTileUnchecked(Tilemap *tilemap, uint32 tileX, uint32 tileY) {
-	assert(tileX < tilemap->width);
-	assert(tileY < tilemap->height);
-	return tilemap->tiles[tileY * tilemap->width + tileX];
+uint32 getTileUnchecked(World *world, Tilemap *tilemap, int32 tileX,
+						int32 tileY) {
+	assert(tileX < world->width);
+	assert(tileY < world->height);
+	return tilemap->tiles[tileY * world->tilemapWidth + tileX];
 }
 
-Tilemap *getTilemap(World *world, uint32 tilemapX, uint32 tilemapY) {
+Tilemap *getTilemap(World *world, int32 tilemapX, int32 tilemapY) {
 	assert(tilemapX < world->width);
 	assert(tilemapY < world->height);
 	return &world->tilemaps[tilemapY * world->width + tilemapX];
 }
 
-bool isTilemapPointEmpty(Tilemap *tilemap, real32 testX, real32 testY) {
+bool isTilemapPointEmpty(World *world, Tilemap *tilemap, real32 testX,
+						 real32 testY) {
 	bool empty = false;
 
-	int32 testTileX = truncateReal32ToInt32((testX - tilemap->upperLeftX) /
-											tilemap->tileWidth);
-	int32 testTileY = truncateReal32ToInt32((testY - tilemap->upperLeftY) /
-											tilemap->tileHeight);
+	int32 testTileX =
+		truncateReal32ToInt32((testX - world->upperLeftX) / world->tileWidth);
+	int32 testTileY =
+		truncateReal32ToInt32((testY - world->upperLeftY) / world->tileHeight);
 
-	if (testTileX >= 0 && testTileX < tilemap->width && testTileY >= 0 &&
-		testTileY < tilemap->height) {
-		uint32 tileID = getTileUnchecked(tilemap, testTileX, testTileY);
+	if (testTileX >= 0 && testTileX < world->tilemapWidth && testTileY >= 0 &&
+		testTileY < world->tilemapHeight) {
+		uint32 tileID = getTileUnchecked(world, tilemap, testTileX, testTileY);
 		if (tileID == 0) {
 			empty = true;
 		}
@@ -97,8 +99,26 @@ bool isTilemapPointEmpty(Tilemap *tilemap, real32 testX, real32 testY) {
 	return empty;
 }
 
-bool isWorldPointEmpty(World *world, real32 testX, real32 testY) {
-	assert(!"Not implemented yet");
+bool isWorldPointEmpty(World *world, int32 testTilemapX, int32 testTilemapY,
+					   real32 testX, real32 testY) {
+	int32 testTileX =
+		truncateReal32ToInt32((testX - world->upperLeftX) / world->tileWidth);
+	int32 testTileY =
+		truncateReal32ToInt32((testY - world->upperLeftY) / world->tileHeight);
+
+	if (testTileX < 0) {
+		testTileX = world->tilemapWidth + testTileX;
+		testTilemapX -= 1;
+	} else if (testTileX >= world->tilemapWidth) {
+	}
+
+	if (testTileY < 0) {
+		testTileY = world->tilemapHeight + testTileY;
+		testTilemapY -= 1;
+	} else if (testTileY >= world->tilemapHeight) {
+	}
+
+	assert(!"not implemented");
 	return false;
 }
 
@@ -108,6 +128,17 @@ void renderPlayer(GameBackbuffer *backbuffer, GameState *gameState,
 void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 						 GameSoundBuffer *soundBuffer, GameInput *input) {
 	assert(sizeof(GameState) <= gameMemory->permanentStorageSize);
+
+	GameState *gameState = (GameState *)gameMemory->permanentStorage;
+	if (!gameMemory->isInitialized) {
+		gameState->tsine = 0.0f;
+		gameState->playerX = 150.0f;
+		gameState->playerY = 150.0f;
+		gameState->playerTilemapX = 0;
+		gameState->playerTilemapY = 0;
+
+		gameMemory->isInitialized = true;
+	}
 
 #define TILEMAP_WIDTH 16
 #define TILEMAP_HEIGHT 9
@@ -157,12 +188,6 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	};
 
 	Tilemap tilemaps[2][2] = {};
-	tilemaps[0][0].width = TILEMAP_WIDTH;
-	tilemaps[0][0].height = TILEMAP_HEIGHT;
-	tilemaps[0][0].upperLeftX = 0.0f;
-	tilemaps[0][0].upperLeftY = 0.0f;
-	tilemaps[0][0].tileWidth = 60.0f;
-	tilemaps[0][0].tileHeight = 60.0f;
 	tilemaps[0][1] = tilemaps[0][0];
 	tilemaps[1][0] = tilemaps[0][0];
 	tilemaps[1][1] = tilemaps[0][0];
@@ -172,32 +197,32 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	tilemaps[1][0].tiles = (uint32 *)tiles10;
 	tilemaps[1][1].tiles = (uint32 *)tiles11;
 
-	Tilemap tilemap = tilemaps[0][0];
-
 	World world = {};
+	world.width = 2;
+	world.height = 2;
+	world.tilemapWidth = TILEMAP_WIDTH;
+	world.tilemapHeight = TILEMAP_HEIGHT;
+	world.upperLeftX = 0.0f;
+	world.upperLeftY = 0.0f;
+	world.tileWidth = 60.0f;
+	world.tileHeight = 60.0f;
 	world.tilemaps = (Tilemap *)tilemaps;
+
+	Tilemap *tilemap = getTilemap(&world, gameState->playerTilemapX,
+								  gameState->playerTilemapY);
 
 	real32 playerR = 0.0f;
 	real32 playerG = 1.0f;
 	real32 playerB = 1.0f;
-	real32 playerWidth = 0.75f * tilemap.tileWidth;
-	real32 playerHeight = 0.75f * tilemap.tileHeight;
-
-	GameState *gameState = (GameState *)gameMemory->permanentStorage;
-	if (!gameMemory->isInitialized) {
-		gameState->tsine = 0.0f;
-		gameState->playerX = 150.0f;
-		gameState->playerY = 150.0f;
-
-		gameMemory->isInitialized = true;
-	}
+	real32 playerWidth = 0.75f * world.tileWidth;
+	real32 playerHeight = 0.75f * world.tileHeight;
 
 	for (size_t i = 0; i < arraylength(input->controllers); i++) {
 		GameControllerInput *controller = gameGetController(input, i);
 
 		if (controller->isAnalog) {
 		} else {
-			real32 speed = 100.0f * input->deltaTime;
+			real32 speed = 200.0f * input->deltaTime;
 			real32 dPlayerX = 0.0f;
 			real32 dPlayerY = 0.0f;
 			if (controller->moveDown.endedDown) dPlayerY = 1.0f;
@@ -210,10 +235,12 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			real32 newPlayerX = gameState->playerX + dPlayerX;
 			real32 newPlayerY = gameState->playerY + dPlayerY;
 
-			if (isTilemapPointEmpty(&tilemap, newPlayerX, newPlayerY) &&
-				isTilemapPointEmpty(&tilemap, newPlayerX - (playerWidth / 2),
+			if (isTilemapPointEmpty(&world, tilemap, newPlayerX, newPlayerY) &&
+				isTilemapPointEmpty(&world, tilemap,
+									newPlayerX - (playerWidth / 2),
 									newPlayerY) &&
-				isTilemapPointEmpty(&tilemap, newPlayerX + (playerWidth / 2),
+				isTilemapPointEmpty(&world, tilemap,
+									newPlayerX + (playerWidth / 2),
 									newPlayerY)) {
 				gameState->playerX = newPlayerX;
 				gameState->playerY = newPlayerY;
@@ -228,18 +255,18 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	renderRectangle(backbuffer, 0, 0, backbuffer->width, backbuffer->height, 1,
 					0, 1);
 
-	for (int32 tileY = 0; tileY < tilemap.height; tileY++) {
-		for (int32 tileX = 0; tileX < tilemap.width; tileX++) {
+	for (int32 tileY = 0; tileY < world.tilemapHeight; tileY++) {
+		for (int32 tileX = 0; tileX < world.tilemapWidth; tileX++) {
 
-			uint32 tileID = getTileUnchecked(&tilemap, tileX, tileY);
+			uint32 tileID = getTileUnchecked(&world, tilemap, tileX, tileY);
 			real32 gray = 0.5f;
 			if (tileID == 1) {
 				gray = 1.0f;
 			}
-			real32 minX = tilemap.upperLeftX + tileX * tilemap.tileWidth;
-			real32 minY = tilemap.upperLeftY + tileY * tilemap.tileHeight;
-			real32 maxX = minX + tilemap.tileWidth;
-			real32 maxY = minY + tilemap.tileHeight;
+			real32 minX = world.upperLeftX + tileX * world.tileWidth;
+			real32 minY = world.upperLeftY + tileY * world.tileHeight;
+			real32 maxX = minX + world.tileWidth;
+			real32 maxY = minY + world.tileHeight;
 			renderRectangle(backbuffer, minX, minY, maxX, maxY, gray, gray,
 							gray);
 		}

@@ -131,16 +131,11 @@ struct GameState {
 	real32 tsine;
 	real32 playerX;
 	real32 playerY;
+	int32 playerTilemapX;
+	int32 playerTilemapY;
 };
 
 struct Tilemap {
-	real32 upperLeftX;
-	real32 upperLeftY;
-	real32 tileWidth;
-	real32 tileHeight;
-	int32 width;
-	int32 height;
-
 	uint32 *tiles;
 };
 
@@ -149,6 +144,12 @@ struct World {
 
 	int32 width;
 	int32 height;
+	real32 upperLeftX;
+	real32 upperLeftY;
+	real32 tileWidth;
+	real32 tileHeight;
+	int32 tilemapWidth;
+	int32 tilemapHeight;
 };
 
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
