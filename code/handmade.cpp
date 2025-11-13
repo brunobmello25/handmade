@@ -66,16 +66,16 @@ void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 	}
 }
 
-uint32 getTileUnchecked(Tilemap *tilemap, uint32 x, uint32 y) {
-	assert(x < tilemap->width);
-	assert(y < tilemap->height);
-	return tilemap->tiles[y * tilemap->width + x];
+uint32 getTileUnchecked(Tilemap *tilemap, uint32 tileX, uint32 tileY) {
+	assert(tileX < tilemap->width);
+	assert(tileY < tilemap->height);
+	return tilemap->tiles[tileY * tilemap->width + tileX];
 }
 
-Tilemap *getTilemap(World *world, uint32 x, uint32 y) {
-	assert(x < world->width);
-	assert(y < world->height);
-	return &world->tilemaps[y * world->width + x];
+Tilemap *getTilemap(World *world, uint32 tilemapX, uint32 tilemapY) {
+	assert(tilemapX < world->width);
+	assert(tilemapY < world->height);
+	return &world->tilemaps[tilemapY * world->width + tilemapX];
 }
 
 bool isTilemapPointEmpty(Tilemap *tilemap, real32 testX, real32 testY) {
