@@ -5,8 +5,8 @@ global_variable real32 PI = 3.14159265359f;
 
 int32 roundReal32ToInt32(real32 value) { return (int32)(value + 0.5f); }
 uint32 roundReal32ToUInt32(real32 value) { return (uint32)(value + 0.5f); }
-int32 truncateReal32ToInt32(real32 value) { return (int32)(value); }
-uint32 truncateReal32ToUInt32(real32 value) { return (uint32)(value); }
+int32 floorReal32ToInt32(real32 value) { return floorf(value); }
+uint32 floorReal32ToUInt32(real32 value) { return floorf(value); }
 
 void renderRectangle(GameBackbuffer *buffer, real32 minXf, real32 minYf,
 					 real32 maxXf, real32 maxYf, real32 R, real32 G, real32 B) {
@@ -103,27 +103,29 @@ inline CanonicalPosition getCanonicalPosition(World *world,
 	result.tilemapX = rawPosition.tilemapX;
 	result.tilemapY = rawPosition.tilemapY;
 
-	result.tileX = truncateReal32ToInt32((rawPosition.x - world->upperLeftX) /
-										 world->tileWidth);
-	result.tileY = truncateReal32ToInt32((rawPosition.y - world->upperLeftY) /
-										 world->tileHeight);
+	result.tileX = floorReal32ToInt32((rawPosition.x - world->upperLeftX) /
+									  world->tileWidth);
+	result.tileY = floorReal32ToInt32((rawPosition.y - world->upperLeftY) /
+									  world->tileHeight);
 	result.x = rawPosition.x - result.tileX * world->tileWidth;
 	result.y = rawPosition.y - result.tileY * world->tileHeight;
 
-	// TODO(bruno): switch this to while loops?
-	if (result.tileX < 0) {
+	assert(result.x >= 0.0f && result.x < world->tileWidth);
+	assert(result.y >= 0.0f && result.y < world->tileHeight);
+
+	while (result.tileX < 0) {
 		result.tileX += world->tilemapWidth;
 		result.tilemapX -= 1;
 	}
-	if (result.tileX >= world->tilemapWidth) {
+	while (result.tileX >= world->tilemapWidth) {
 		result.tileX -= world->tilemapWidth;
 		result.tilemapX += 1;
 	}
-	if (result.tileY < 0) {
+	while (result.tileY < 0) {
 		result.tileY += world->tilemapHeight;
 		result.tilemapY -= 1;
 	}
-	if (result.tileY >= world->tilemapHeight) {
+	while (result.tileY >= world->tilemapHeight) {
 		result.tileY -= world->tilemapHeight;
 		result.tilemapY += 1;
 	}
@@ -263,8 +265,14 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			if (isWorldPointEmpty(&world, playerPos) &&
 				isWorldPointEmpty(&world, playerLeft) &&
 				isWorldPointEmpty(&world, playerRight)) {
-				gameState->playerX = newPlayerX;
-				gameState->playerY = newPlayerY;
+				CanonicalPosition canonicalPosition =
+					getCanonicalPosition(&world, playerPos);
+				gameState->playerX = canonicalPosition.x +
+									 canonicalPosition.tileX * world.tileWidth;
+				gameState->playerY = canonicalPosition.y +
+									 canonicalPosition.tileY * world.tileHeight;
+				gameState->playerTilemapX = canonicalPosition.tilemapX;
+				gameState->playerTilemapY = canonicalPosition.tilemapY;
 			}
 		}
 	}
