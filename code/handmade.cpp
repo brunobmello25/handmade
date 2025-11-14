@@ -76,12 +76,15 @@ uint32 getTileUnchecked(World *world, Tilemap *tilemap, int32 tileX,
 Tilemap *getTilemap(World *world, int32 tilemapX, int32 tilemapY) {
 	assert(tilemapX < world->width);
 	assert(tilemapY < world->height);
+	assert(tilemapX >= 0);
+	assert(tilemapY >= 0);
 	return &world->tilemaps[tilemapY * world->width + tilemapX];
 }
 
 bool isTilemapPointEmpty(World *world, Tilemap *tilemap, real32 testX,
 						 real32 testY) {
 	bool empty = false;
+	if (!tilemap) return false;
 
 	int32 testTileX =
 		truncateReal32ToInt32((testX - world->upperLeftX) / world->tileWidth);
@@ -107,19 +110,27 @@ bool isWorldPointEmpty(World *world, int32 testTilemapX, int32 testTilemapY,
 		truncateReal32ToInt32((testY - world->upperLeftY) / world->tileHeight);
 
 	if (testTileX < 0) {
-		testTileX = world->tilemapWidth + testTileX;
+		testTileX += world->tilemapWidth;
 		testTilemapX -= 1;
 	} else if (testTileX >= world->tilemapWidth) {
+		testTileX -= world->tilemapWidth;
+		testTilemapX += 1;
 	}
-
 	if (testTileY < 0) {
-		testTileY = world->tilemapHeight + testTileY;
+		testTileY += world->tilemapHeight;
 		testTilemapY -= 1;
 	} else if (testTileY >= world->tilemapHeight) {
+		testTileY -= world->tilemapHeight;
+		testTilemapY += 1;
 	}
 
-	assert(!"not implemented");
-	return false;
+	if (testTilemapX < 0 || testTilemapX >= world->width || testTilemapY < 0 ||
+		testTilemapY >= world->height) {
+		return false;
+	}
+
+	Tilemap *tilemap = getTilemap(world, testTilemapX, testTilemapY);
+	return isTilemapPointEmpty(world, tilemap, testX, testY);
 }
 
 void renderPlayer(GameBackbuffer *backbuffer, GameState *gameState,
@@ -235,13 +246,15 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			real32 newPlayerX = gameState->playerX + dPlayerX;
 			real32 newPlayerY = gameState->playerY + dPlayerY;
 
-			if (isTilemapPointEmpty(&world, tilemap, newPlayerX, newPlayerY) &&
-				isTilemapPointEmpty(&world, tilemap,
-									newPlayerX - (playerWidth / 2),
-									newPlayerY) &&
-				isTilemapPointEmpty(&world, tilemap,
-									newPlayerX + (playerWidth / 2),
-									newPlayerY)) {
+			if (isWorldPointEmpty(&world, gameState->playerTilemapX,
+								  gameState->playerTilemapY, newPlayerX,
+								  newPlayerY) &&
+				isWorldPointEmpty(&world, gameState->playerTilemapX,
+								  gameState->playerTilemapY,
+								  newPlayerX - (playerWidth / 2), newPlayerY) &&
+				isWorldPointEmpty(&world, gameState->playerTilemapX,
+								  gameState->playerTilemapY,
+								  newPlayerX + (playerWidth / 2), newPlayerY)) {
 				gameState->playerX = newPlayerX;
 				gameState->playerY = newPlayerY;
 			}
