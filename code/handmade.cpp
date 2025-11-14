@@ -68,8 +68,8 @@ void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 
 uint32 getTileUnchecked(World *world, Tilemap *tilemap, int32 tileX,
 						int32 tileY) {
-	assert(tileX < world->width);
-	assert(tileY < world->height);
+	assert(tileX < world->tilemapWidth);
+	assert(tileY < world->tilemapHeight);
 	return tilemap->tiles[tileY * world->tilemapWidth + tileX];
 }
 
