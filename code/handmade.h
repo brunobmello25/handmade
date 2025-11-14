@@ -152,6 +152,22 @@ struct World {
 	int32 tilemapHeight;
 };
 
+struct CanonicalPosition {
+	int32 tilemapX;
+	int32 tilemapY;
+	int32 tileX;
+	int32 tileY;
+	real32 x;
+	real32 y;
+};
+
+struct RawPosition {
+	int32 tilemapX;
+	int32 tilemapY;
+	real32 x;
+	real32 y;
+};
+
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
 	assert(index >= 0 && index < arraylength(input->controllers));
 

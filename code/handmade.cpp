@@ -97,39 +97,48 @@ bool isTilemapPointEmpty(World *world, Tilemap *tilemap, int32 testTileX,
 	return empty;
 }
 
-bool isWorldPointEmpty(World *world, int32 testTilemapX, int32 testTilemapY,
-					   real32 testX, real32 testY) {
-	int32 testTileX =
-		truncateReal32ToInt32((testX - world->upperLeftX) / world->tileWidth);
-	int32 testTileY =
-		truncateReal32ToInt32((testY - world->upperLeftY) / world->tileHeight);
+inline CanonicalPosition getCanonicalPosition(World *world,
+											  RawPosition rawPosition) {
+	CanonicalPosition result;
+	result.tilemapX = rawPosition.tilemapX;
+	result.tilemapY = rawPosition.tilemapY;
 
-	if (testTileX < 0) {
-		testTileX += world->tilemapWidth;
-		testTilemapX -= 1;
-	} else if (testTileX >= world->tilemapWidth) {
-		testTileX -= world->tilemapWidth;
-		testTilemapX += 1;
+	result.tileX = truncateReal32ToInt32((rawPosition.x - world->upperLeftX) /
+										 world->tileWidth);
+	result.tileY = truncateReal32ToInt32((rawPosition.y - world->upperLeftY) /
+										 world->tileHeight);
+	result.x = rawPosition.x - result.tileX * world->tileWidth;
+	result.y = rawPosition.y - result.tileY * world->tileHeight;
+
+	// TODO(bruno): switch this to while loops?
+	if (result.tileX < 0) {
+		result.tileX += world->tilemapWidth;
+		result.tilemapX -= 1;
 	}
-	if (testTileY < 0) {
-		testTileY += world->tilemapHeight;
-		testTilemapY -= 1;
-	} else if (testTileY >= world->tilemapHeight) {
-		testTileY -= world->tilemapHeight;
-		testTilemapY += 1;
+	if (result.tileX >= world->tilemapWidth) {
+		result.tileX -= world->tilemapWidth;
+		result.tilemapX += 1;
+	}
+	if (result.tileY < 0) {
+		result.tileY += world->tilemapHeight;
+		result.tilemapY -= 1;
+	}
+	if (result.tileY >= world->tilemapHeight) {
+		result.tileY -= world->tilemapHeight;
+		result.tilemapY += 1;
 	}
 
-	if (testTilemapX < 0 || testTilemapX >= world->width || testTilemapY < 0 ||
-		testTilemapY >= world->height) {
-		return false;
-	}
-
-	Tilemap *tilemap = getTilemap(world, testTilemapX, testTilemapY);
-	return isTilemapPointEmpty(world, tilemap, testTileX, testTileY);
+	return result;
 }
 
-void renderPlayer(GameBackbuffer *backbuffer, GameState *gameState,
-				  real32 tileWidth, real32 tileHeight) {}
+bool isWorldPointEmpty(World *world, RawPosition pos) {
+	CanonicalPosition canonicalPosition = getCanonicalPosition(world, pos);
+
+	Tilemap *tilemap = getTilemap(world, canonicalPosition.tilemapX,
+								  canonicalPosition.tilemapY);
+	return isTilemapPointEmpty(world, tilemap, canonicalPosition.tileX,
+							   canonicalPosition.tileY);
+}
 
 void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 						 GameSoundBuffer *soundBuffer, GameInput *input) {
@@ -241,15 +250,19 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			real32 newPlayerX = gameState->playerX + dPlayerX;
 			real32 newPlayerY = gameState->playerY + dPlayerY;
 
-			if (isWorldPointEmpty(&world, gameState->playerTilemapX,
-								  gameState->playerTilemapY, newPlayerX,
-								  newPlayerY) &&
-				isWorldPointEmpty(&world, gameState->playerTilemapX,
-								  gameState->playerTilemapY,
-								  newPlayerX - (playerWidth / 2), newPlayerY) &&
-				isWorldPointEmpty(&world, gameState->playerTilemapX,
-								  gameState->playerTilemapY,
-								  newPlayerX + (playerWidth / 2), newPlayerY)) {
+			RawPosition playerPos = {};
+			playerPos.tilemapX = gameState->playerTilemapX;
+			playerPos.tilemapY = gameState->playerTilemapY;
+			playerPos.x = newPlayerX;
+			playerPos.y = newPlayerY;
+			RawPosition playerLeft = playerPos;
+			playerLeft.x = newPlayerX - (playerWidth / 2);
+			RawPosition playerRight = playerPos;
+			playerRight.x = newPlayerX + (playerWidth / 2);
+
+			if (isWorldPointEmpty(&world, playerPos) &&
+				isWorldPointEmpty(&world, playerLeft) &&
+				isWorldPointEmpty(&world, playerRight)) {
 				gameState->playerX = newPlayerX;
 				gameState->playerY = newPlayerY;
 			}
