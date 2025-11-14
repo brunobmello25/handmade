@@ -129,18 +129,15 @@ struct GameInput {
 
 struct GameState {
 	real32 tsine;
+
+	// TODO(bruno): should use canonical position here
 	real32 playerX;
 	real32 playerY;
+	int32 playerTilemapX;
+	int32 playerTilemapY;
 };
 
 struct Tilemap {
-	real32 upperLeftX;
-	real32 upperLeftY;
-	real32 tileWidth;
-	real32 tileHeight;
-	int32 width;
-	int32 height;
-
 	uint32 *tiles;
 };
 
@@ -149,6 +146,28 @@ struct World {
 
 	int32 width;
 	int32 height;
+	real32 upperLeftX;
+	real32 upperLeftY;
+	real32 tileWidth;
+	real32 tileHeight;
+	int32 tilemapWidth;
+	int32 tilemapHeight;
+};
+
+struct CanonicalPosition {
+	int32 tilemapX;
+	int32 tilemapY;
+	int32 tileX;
+	int32 tileY;
+	real32 x;
+	real32 y;
+};
+
+struct RawPosition {
+	int32 tilemapX;
+	int32 tilemapY;
+	real32 x;
+	real32 y;
 };
 
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
