@@ -81,15 +81,10 @@ Tilemap *getTilemap(World *world, int32 tilemapX, int32 tilemapY) {
 	return &world->tilemaps[tilemapY * world->width + tilemapX];
 }
 
-bool isTilemapPointEmpty(World *world, Tilemap *tilemap, real32 testX,
-						 real32 testY) {
+bool isTilemapPointEmpty(World *world, Tilemap *tilemap, int32 testTileX,
+						 int32 testTileY) {
 	bool empty = false;
 	if (!tilemap) return false;
-
-	int32 testTileX =
-		truncateReal32ToInt32((testX - world->upperLeftX) / world->tileWidth);
-	int32 testTileY =
-		truncateReal32ToInt32((testY - world->upperLeftY) / world->tileHeight);
 
 	if (testTileX >= 0 && testTileX < world->tilemapWidth && testTileY >= 0 &&
 		testTileY < world->tilemapHeight) {
@@ -130,7 +125,7 @@ bool isWorldPointEmpty(World *world, int32 testTilemapX, int32 testTilemapY,
 	}
 
 	Tilemap *tilemap = getTilemap(world, testTilemapX, testTilemapY);
-	return isTilemapPointEmpty(world, tilemap, testX, testY);
+	return isTilemapPointEmpty(world, tilemap, testTileX, testTileY);
 }
 
 void renderPlayer(GameBackbuffer *backbuffer, GameState *gameState,
@@ -204,8 +199,8 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	tilemaps[1][1] = tilemaps[0][0];
 
 	tilemaps[0][0].tiles = (uint32 *)tiles00;
-	tilemaps[0][1].tiles = (uint32 *)tiles01;
-	tilemaps[1][0].tiles = (uint32 *)tiles10;
+	tilemaps[1][0].tiles = (uint32 *)tiles01;
+	tilemaps[0][1].tiles = (uint32 *)tiles10;
 	tilemaps[1][1].tiles = (uint32 *)tiles11;
 
 	World world = {};
