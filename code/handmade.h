@@ -129,6 +129,8 @@ struct GameInput {
 
 struct GameState {
 	real32 tsine;
+
+	// TODO(bruno): should use canonical position here
 	real32 playerX;
 	real32 playerY;
 	int32 playerTilemapX;
