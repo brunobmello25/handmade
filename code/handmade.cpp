@@ -1,12 +1,7 @@
 #include "handmade.h"
-#include <math.h>
+#include "handmade_intrinsics.h"
 
 global_variable real32 PI = 3.14159265359f;
-
-int32 roundReal32ToInt32(real32 value) { return (int32)(value + 0.5f); }
-uint32 roundReal32ToUInt32(real32 value) { return (uint32)(value + 0.5f); }
-int32 floorReal32ToInt32(real32 value) { return floorf(value); }
-uint32 floorReal32ToUInt32(real32 value) { return floorf(value); }
 
 void renderRectangle(GameBackbuffer *buffer, real32 minXf, real32 minYf,
 					 real32 maxXf, real32 maxYf, real32 R, real32 G, real32 B) {
@@ -51,7 +46,7 @@ void gameOutputSound(GameSoundBuffer *soundBuffer, GameState *gameState) {
 		// audio with a sine wave
 #if ENABLE_SINE_WAVE
 		int toneVolume = 3000;
-		real32 sineValue = sinf(gameState->tsine);
+		real32 sineValue = sin(gameState->tsine);
 		int16 sampleValue = (int16)(sineValue * toneVolume);
 #else
 		int16 sampleValue = 0;
