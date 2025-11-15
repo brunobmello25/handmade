@@ -98,10 +98,8 @@ inline CanonicalPosition getCanonicalPosition(World *world,
 	result.tilemapX = rawPosition.tilemapX;
 	result.tilemapY = rawPosition.tilemapY;
 
-	result.tileX = floorReal32ToInt32((rawPosition.x - world->upperLeftX) /
-									  world->tileWidth);
-	result.tileY = floorReal32ToInt32((rawPosition.y - world->upperLeftY) /
-									  world->tileHeight);
+	result.tileX = floorReal32ToInt32(rawPosition.x / world->tileWidth);
+	result.tileY = floorReal32ToInt32(rawPosition.y / world->tileHeight);
 	result.x = rawPosition.x - result.tileX * world->tileWidth;
 	result.y = rawPosition.y - result.tileY * world->tileHeight;
 
@@ -214,8 +212,6 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	world.height = 2;
 	world.tilemapWidth = TILEMAP_WIDTH;
 	world.tilemapHeight = TILEMAP_HEIGHT;
-	world.upperLeftX = 0.0f;
-	world.upperLeftY = 0.0f;
 	world.tileWidth = 60.0f;
 	world.tileHeight = 60.0f;
 	world.tilemaps = (Tilemap *)tilemaps;
@@ -287,8 +283,8 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			if (tileID == 1) {
 				gray = 1.0f;
 			}
-			real32 minX = world.upperLeftX + tileX * world.tileWidth;
-			real32 minY = world.upperLeftY + tileY * world.tileHeight;
+			real32 minX = tileX * world.tileWidth;
+			real32 minY = tileY * world.tileHeight;
 			real32 maxX = minX + world.tileWidth;
 			real32 maxY = minY + world.tileHeight;
 			renderRectangle(backbuffer, minX, minY, maxX, maxY, gray, gray,

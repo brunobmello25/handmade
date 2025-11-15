@@ -145,8 +145,6 @@ struct World {
 
 	int32 width;
 	int32 height;
-	real32 upperLeftX;
-	real32 upperLeftY;
 	real32 tileWidth;
 	real32 tileHeight;
 	int32 tilemapWidth;
