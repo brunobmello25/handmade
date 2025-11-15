@@ -98,13 +98,17 @@ inline CanonicalPosition getCanonicalPosition(World *world,
 	result.tilemapX = rawPosition.tilemapX;
 	result.tilemapY = rawPosition.tilemapY;
 
-	result.tileX = floorReal32ToInt32(rawPosition.x / world->tileWidth);
-	result.tileY = floorReal32ToInt32(rawPosition.y / world->tileHeight);
-	result.x = rawPosition.x - result.tileX * world->tileWidth;
-	result.y = rawPosition.y - result.tileY * world->tileHeight;
+	result.tileX =
+		floorReal32ToInt32(rawPosition.x / (real32)world->tileSideInPixels);
+	result.tileY =
+		floorReal32ToInt32(rawPosition.y / (real32)world->tileSideInPixels);
+	result.x = rawPosition.x -
+			   ((real32)result.tileX * (real32)world->tileSideInPixels);
+	result.y = rawPosition.y -
+			   ((real32)result.tileY * (real32)world->tileSideInPixels);
 
-	assert(result.x >= 0.0f && result.x < world->tileWidth);
-	assert(result.y >= 0.0f && result.y < world->tileHeight);
+	assert(result.x >= 0.0f && result.x < world->tileSideInPixels);
+	assert(result.y >= 0.0f && result.y < world->tileSideInPixels);
 
 	while (result.tileX < 0) {
 		result.tileX += world->tilemapWidth;
@@ -212,9 +216,9 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	world.height = 2;
 	world.tilemapWidth = TILEMAP_WIDTH;
 	world.tilemapHeight = TILEMAP_HEIGHT;
-	world.tileWidth = 60.0f;
-	world.tileHeight = 60.0f;
 	world.tilemaps = (Tilemap *)tilemaps;
+	world.tileSideInMeters = 1.4f;
+	world.tileSideInPixels = 60;
 
 	Tilemap *tilemap = getTilemap(&world, gameState->playerTilemapX,
 								  gameState->playerTilemapY);
@@ -222,8 +226,8 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	real32 playerR = 0.0f;
 	real32 playerG = 1.0f;
 	real32 playerB = 1.0f;
-	real32 playerWidth = 0.75f * world.tileWidth;
-	real32 playerHeight = 0.75f * world.tileHeight;
+	real32 playerWidth = 0.75f * world.tileSideInPixels;
+	real32 playerHeight = 0.75f * world.tileSideInPixels;
 
 	for (size_t i = 0; i < arraylength(input->controllers); i++) {
 		GameControllerInput *controller = gameGetController(input, i);
@@ -258,10 +262,12 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 				isWorldPointEmpty(&world, playerRight)) {
 				CanonicalPosition canonicalPosition =
 					getCanonicalPosition(&world, playerPos);
-				gameState->playerX = canonicalPosition.x +
-									 canonicalPosition.tileX * world.tileWidth;
-				gameState->playerY = canonicalPosition.y +
-									 canonicalPosition.tileY * world.tileHeight;
+				gameState->playerX =
+					canonicalPosition.x +
+					canonicalPosition.tileX * world.tileSideInPixels;
+				gameState->playerY =
+					canonicalPosition.y +
+					canonicalPosition.tileY * world.tileSideInPixels;
 				gameState->playerTilemapX = canonicalPosition.tilemapX;
 				gameState->playerTilemapY = canonicalPosition.tilemapY;
 			}
@@ -283,10 +289,10 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			if (tileID == 1) {
 				gray = 1.0f;
 			}
-			real32 minX = tileX * world.tileWidth;
-			real32 minY = tileY * world.tileHeight;
-			real32 maxX = minX + world.tileWidth;
-			real32 maxY = minY + world.tileHeight;
+			real32 minX = tileX * world.tileSideInPixels;
+			real32 minY = tileY * world.tileSideInPixels;
+			real32 maxX = minX + world.tileSideInPixels;
+			real32 maxY = minY + world.tileSideInPixels;
 			renderRectangle(backbuffer, minX, minY, maxX, maxY, gray, gray,
 							gray);
 		}
