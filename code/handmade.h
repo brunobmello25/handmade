@@ -142,13 +142,11 @@ struct Tilemap {
 
 struct World {
 	Tilemap *tilemaps;
+	real32 tileSideInMeters;
+	uint32 tileSideInPixels;
 
 	int32 width;
 	int32 height;
-	real32 upperLeftX;
-	real32 upperLeftY;
-	real32 tileWidth;
-	real32 tileHeight;
 	int32 tilemapWidth;
 	int32 tilemapHeight;
 };
