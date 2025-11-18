@@ -5,9 +5,10 @@ set -e
 PLATFORM=${1:-sdl3}
 
 usage() {
-    echo "Usage: $0 [sdl3|sdl3-local] [32|64]"
+    echo "Usage: $0 [sdl3|sdl3-local|test]"
     echo "  sdl3:        Build with SDL3 (system/pkg-config)"
     echo "  sdl3-local:  Build with local SDL3 from external/"
+    echo "  test:        Build test executable"
     echo ""
     echo "Environment variables:"
     echo "  USE_BEAR=1          Generate compile_commands.json (slower build)"
@@ -19,7 +20,7 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     usage
 fi
 
-if [[ "$PLATFORM" != "sdl3" && "$PLATFORM" != "sdl3-local" ]]; then
+if [[ "$PLATFORM" != "sdl3" && "$PLATFORM" != "sdl3-local" && "$PLATFORM" != "test" ]]; then
     echo "Error: Invalid platform '$PLATFORM'"
     usage
 fi
@@ -36,6 +37,16 @@ mkdir -p ./target
 pushd ./target/
 
 COMMON_FLAGS="-DENABLE_SINE_WAVE=0 -DHANDMADE_PLATFORMDEBUG=0 -DHANDMADE_SLOW=1 -DHANDMADE_INTERNAL=1 -DGAME_LIB_PATH=\"./target/handmade.so\" -g -Wall -Wno-write-strings -Werror -fno-rtti -fno-exceptions"
+
+# Handle test build differently
+if [ "$PLATFORM" = "test" ]; then
+    echo "Compiling test executable..."
+    $COMPILER $COMMON_FLAGS ../code/test_handmade.cpp -o handmade_test
+    popd
+    echo "Test build completed successfully!"
+    echo "Run tests with: ./target/handmade_test"
+    exit 0
+fi
 
 # Always compile the game code (fast)
 echo "Compiling game code..."
