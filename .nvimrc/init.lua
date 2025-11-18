@@ -31,9 +31,15 @@ end, {})
 
 local dap = require("dap")
 
+dap.adapters.gdb = {
+	type = "executable",
+	command = "gdb",
+	args = { "-i", "dap" },
+}
+
 dap.configurations.cpp = {
 	{
-		name = "Debug Game",
+		name = "Debug Game (codelldb)",
 		type = "codelldb",
 		request = "launch",
 		program = vim.fn.getcwd() .. "/target/handmade",
@@ -41,8 +47,24 @@ dap.configurations.cpp = {
 		stopOnEntry = false,
 	},
 	{
-		name = "Debug Tests",
+		name = "Debug Tests (codelldb)",
 		type = "codelldb",
+		request = "launch",
+		program = vim.fn.getcwd() .. "/target/handmade_test",
+		cwd = vim.fn.getcwd(),
+		stopOnEntry = false,
+	},
+	{
+		name = "Debug Game (gdb)",
+		type = "gdb",
+		request = "launch",
+		program = vim.fn.getcwd() .. "/target/handmade",
+		cwd = vim.fn.getcwd(),
+		stopOnEntry = false,
+	},
+	{
+		name = "Debug Tests (gdb)",
+		type = "gdb",
 		request = "launch",
 		program = vim.fn.getcwd() .. "/target/handmade_test",
 		cwd = vim.fn.getcwd(),

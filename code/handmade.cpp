@@ -220,15 +220,15 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	real32 playerR = 0.0f;
 	real32 playerG = 1.0f;
 	real32 playerB = 1.0f;
-	real32 playerWidth = 0.75f * world.tileSideInPixels;
-	real32 playerHeight = 0.75f * world.tileSideInPixels;
+	real32 playerHeight = world.tileSideInMeters;
+	real32 playerWidth = 0.75f * playerHeight;
 
 	for (size_t i = 0; i < arraylength(input->controllers); i++) {
 		GameControllerInput *controller = gameGetController(input, i);
 
 		if (controller->isAnalog) {
 		} else {
-			real32 speed = 200.0f * input->deltaTime;
+			real32 speed = 10.0f * input->deltaTime;
 			real32 dPlayerX = 0.0f;
 			real32 dPlayerY = 0.0f;
 			if (controller->moveDown.endedDown) dPlayerY = 1.0f;
