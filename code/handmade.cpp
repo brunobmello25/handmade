@@ -98,7 +98,7 @@ inline void recanonicalizeCoord(World *world, int32 tileCount, int32 *tilemap,
 		floorReal32ToInt32(*relative / (real32)world->tileSideInPixels);
 
 	*tile += overflow;
-	*relative -= overflow * world->tileSideInPixels;
+	*relative -= ((real32)overflow * (real32)world->tileSideInPixels);
 
 	assert(*relative >= 0.0f);
 	assert(*relative < world->tileSideInPixels);
