@@ -10,3 +10,7 @@ vim.api.nvim_create_autocmd("BufWritePost", {
 		vim.cmd("silent !bin/build > /dev/null 2>&1")
 	end,
 })
+
+vim.api.nvim_create_user_command("BuildTest", function()
+	vim.cmd("!bin/build test")
+end, {})
