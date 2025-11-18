@@ -140,8 +140,8 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 		gameState->tsine = 0.0f;
 		gameState->playerPos.tilemapX = 0;
 		gameState->playerPos.tilemapY = 0;
-		gameState->playerPos.tileX = 2;
-		gameState->playerPos.tileY = 2;
+		gameState->playerPos.tileX = 3;
+		gameState->playerPos.tileY = 3;
 		gameState->playerPos.x = 5.0f;
 		gameState->playerPos.y = 5.0f; // 5 pixels offset for now
 
@@ -241,7 +241,7 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			CanonicalPosition newPosition = gameState->playerPos;
 			newPosition.x += dPlayerX;
 			newPosition.y += dPlayerY;
-			newPosition = recanonicalizePosition(&world, gameState->playerPos);
+			newPosition = recanonicalizePosition(&world, newPosition);
 
 			CanonicalPosition newLeft = newPosition;
 			newLeft.x -= (playerWidth / 2);
@@ -284,8 +284,8 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 
 	real32 playerLeft = world.tileSideInPixels * gameState->playerPos.tileX +
 						gameState->playerPos.x - 0.5f * playerWidth;
-	real32 playerTop = gameState->playerPos.tileY + gameState->playerPos.y -
-					   0.5f * playerHeight;
+	real32 playerTop = world.tileSideInPixels * gameState->playerPos.tileY +
+					   gameState->playerPos.y - 0.5f * playerHeight;
 	real32 playerRight = playerLeft + playerWidth;
 	real32 playerBottom = playerTop + playerHeight;
 	renderRectangle(backbuffer, playerLeft, playerTop, playerRight,
