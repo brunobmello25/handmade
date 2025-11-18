@@ -136,8 +136,8 @@ struct CanonicalPosition {
 	int32 _tileX;
 	int32 _tileY;
 #endif
-	real32 x;
-	real32 y;
+	real32 tileRelX;
+	real32 tileRelY;
 };
 
 struct GameState {
@@ -161,6 +161,7 @@ struct World {
 	Tilemap *tilemaps;
 	real32 tileSideInMeters;
 	uint32 tileSideInPixels;
+	real32 metersToPixels;
 
 	int32 width;
 	int32 height;
