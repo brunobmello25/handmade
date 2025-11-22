@@ -126,13 +126,27 @@ struct GameInput {
 	GameControllerInput controllers[MAX_CONTROLLERS + 1];
 };
 
+struct ChunkPosition {
+	uint32 chunkX;
+	uint32 chunkY;
+	uint32 tileX;
+	uint32 tileY;
+};
+
 struct WorldPosition {
+#if 0
 	int32 tilemapX;
 	int32 tilemapY;
 	int32 tileX;
 	int32 tileY;
 	real32 tileRelX;
 	real32 tileRelY;
+#else
+	uint32 tileX;
+	uint32 tileY;
+	real32 tileOffsetX;
+	real32 tileOffsetY;
+#endif
 };
 
 struct GameState {
@@ -140,23 +154,26 @@ struct GameState {
 	WorldPosition playerPos;
 };
 
+struct Chunk {
+	uint32 *tiles;
+};
+
 struct Tilemap {
 	uint32 *tiles;
 };
 
 struct World {
-	Tilemap *tilemaps;
+	Chunk *chunks;
 	real32 tileSideInMeters;
 	uint32 tileSideInPixels;
 	real32 metersToPixels;
 
-	int32 width;
-	int32 height;
-	int32 tilemapWidth;
-	int32 tilemapHeight;
-
 	int32 lowerLeftX;
 	int32 lowerLeftY;
+
+	int32 chunkShift;
+	int32 chunkMask;
+	uint32 chunkSize;
 };
 
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
