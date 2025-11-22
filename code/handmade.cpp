@@ -240,8 +240,8 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			real32 speed = 5.0f * input->deltaTime;
 			real32 dPlayerX = 0.0f;
 			real32 dPlayerY = 0.0f;
-			if (controller->moveDown.endedDown) dPlayerY = 1.0f;
-			if (controller->moveUp.endedDown) dPlayerY = -1.0f;
+			if (controller->moveDown.endedDown) dPlayerY = -1.0f;
+			if (controller->moveUp.endedDown) dPlayerY = 1.0f;
 			if (controller->moveLeft.endedDown) dPlayerX = -1.0f;
 			if (controller->moveRight.endedDown) dPlayerX = 1.0f;
 			dPlayerX *= speed;
