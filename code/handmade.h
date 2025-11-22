@@ -134,19 +134,10 @@ struct ChunkPosition {
 };
 
 struct WorldPosition {
-#if 0
-	int32 tilemapX;
-	int32 tilemapY;
-	int32 tileX;
-	int32 tileY;
-	real32 tileRelX;
-	real32 tileRelY;
-#else
 	uint32 tileX;
 	uint32 tileY;
 	real32 tileOffsetX;
 	real32 tileOffsetY;
-#endif
 };
 
 struct GameState {
