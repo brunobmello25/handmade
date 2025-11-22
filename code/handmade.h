@@ -126,31 +126,18 @@ struct GameInput {
 	GameControllerInput controllers[MAX_CONTROLLERS + 1];
 };
 
-struct CanonicalPosition {
-#if 1
+struct WorldPosition {
 	int32 tilemapX;
 	int32 tilemapY;
 	int32 tileX;
 	int32 tileY;
-#else
-	int32 _tileX;
-	int32 _tileY;
-#endif
 	real32 tileRelX;
 	real32 tileRelY;
 };
 
 struct GameState {
 	real32 tsine;
-
-#if 0
-	real32 playerX;
-	real32 playerY;
-	int32 playerTilemapX;
-	int32 playerTilemapY;
-#else
-	CanonicalPosition playerPos;
-#endif
+	WorldPosition playerPos;
 };
 
 struct Tilemap {
@@ -167,13 +154,6 @@ struct World {
 	int32 height;
 	int32 tilemapWidth;
 	int32 tilemapHeight;
-};
-
-struct RawPosition {
-	int32 tilemapX;
-	int32 tilemapY;
-	real32 x;
-	real32 y;
 };
 
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {

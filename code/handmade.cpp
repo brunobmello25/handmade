@@ -118,10 +118,10 @@ inline void recanonicalizeCoord(World *world, int32 tileCount, int32 *tilemap,
 	}
 }
 
-inline CanonicalPosition recanonicalizePosition(World *world,
-												CanonicalPosition position) {
+inline WorldPosition recanonicalizePosition(World *world,
+											WorldPosition position) {
 
-	CanonicalPosition result = position;
+	WorldPosition result = position;
 
 	recanonicalizeCoord(world, world->tilemapWidth, &result.tilemapX,
 						&result.tileX, &result.tileRelX);
@@ -131,7 +131,7 @@ inline CanonicalPosition recanonicalizePosition(World *world,
 	return result;
 }
 
-bool isWorldPointEmpty(World *world, CanonicalPosition pos) {
+bool isWorldPointEmpty(World *world, WorldPosition pos) {
 	Tilemap *tilemap = getTilemap(world, pos.tilemapX, pos.tilemapY);
 	return isTilemapPointEmpty(world, tilemap, pos.tileX, pos.tileY);
 }
@@ -245,15 +245,15 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			dPlayerX *= speed;
 			dPlayerY *= speed;
 
-			CanonicalPosition newPosition = gameState->playerPos;
+			WorldPosition newPosition = gameState->playerPos;
 			newPosition.tileRelX += dPlayerX;
 			newPosition.tileRelY += dPlayerY;
 			newPosition = recanonicalizePosition(&world, newPosition);
 
-			CanonicalPosition newLeft = newPosition;
+			WorldPosition newLeft = newPosition;
 			newLeft.tileRelX -= (playerWidth / 2);
 			newLeft = recanonicalizePosition(&world, newLeft);
-			CanonicalPosition newRight = newPosition;
+			WorldPosition newRight = newPosition;
 			newRight.tileRelX += (playerWidth / 2);
 			newRight = recanonicalizePosition(&world, newRight);
 
