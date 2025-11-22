@@ -142,7 +142,8 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	}
 
 	// clang-format off
-	uint32 tiles00[256][256] = {
+	#define CHUNK_SIZE 256
+	uint32 tiles00[CHUNK_SIZE][CHUNK_SIZE] = {
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -159,7 +160,7 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	chunks[0][0].tiles = (uint32 *)tiles00;
 
 	World world = {};
-	world.chunkSize = 256;
+	world.chunkSize = CHUNK_SIZE;
 	world.chunks = (Chunk *)chunks;
 	world.tileSideInMeters = 1.4f;
 	world.tileSideInPixels = 60;
