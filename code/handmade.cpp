@@ -69,19 +69,6 @@ uint32 getTileUnchecked(World *world, Chunk *chunk, uint32 tileX,
 	return chunk->tiles[tileY * world->chunkSize + tileX];
 }
 
-Tilemap *getTilemap(World *world, int32 tilemapX, int32 tilemapY) {
-#if 0
-	assert(tilemapX < world->chunkCountX);
-	assert(tilemapY < world->chunkCountY);
-	assert(tilemapX >= 0);
-	assert(tilemapY >= 0);
-	return &world->tilemaps[tilemapY * world->chunkCountX + tilemapX];
-#else
-	assert(!"Not implemented yet");
-	return 0;
-#endif
-}
-
 inline void recanonicalizeCoord(World *world, uint32 *tile,
 								real32 *tileOffset) {
 	// TODO(bruno): figure out a way to do this without division and
