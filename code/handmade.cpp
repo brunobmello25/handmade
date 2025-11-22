@@ -220,6 +220,8 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	world.tileSideInPixels = 60;
 	world.metersToPixels =
 		((real32)world.tileSideInPixels / world.tileSideInMeters);
+	world.lowerLeftX = 0;
+	world.lowerLeftY = backbuffer->height;
 
 	Tilemap *tilemap = getTilemap(&world, gameState->playerPos.tilemapX,
 								  gameState->playerPos.tilemapY);
@@ -272,39 +274,43 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	renderRectangle(backbuffer, 0, 0, backbuffer->width, backbuffer->height, 1,
 					0, 1);
 
-	for (int32 tileY = 0; tileY < world.tilemapHeight; tileY++) {
-		for (int32 tileX = 0; tileX < world.tilemapWidth; tileX++) {
+	for (int32 row = 0; row < world.tilemapHeight; row++) {
+		for (int32 column = 0; column < world.tilemapWidth; column++) {
 
-			uint32 tileID = getTileUnchecked(&world, tilemap, tileX, tileY);
+			uint32 tileID = getTileUnchecked(&world, tilemap, column, row);
 			real32 gray = 0.5f;
 			if (tileID == 1) {
 				gray = 1.0f;
 			}
 
 #if HANDMADE_INTERNAL
-			if (tileX == gameState->playerPos.tileX &&
-				tileY == gameState->playerPos.tileY) {
+			if (column == gameState->playerPos.tileX &&
+				row == gameState->playerPos.tileY) {
 				gray = 0.0f;
 			}
 #endif
 
-			real32 minX = tileX * world.tileSideInPixels;
-			real32 minY = tileY * world.tileSideInPixels;
+			real32 minX = world.lowerLeftX + column * world.tileSideInPixels;
+			real32 minY = world.lowerLeftY - row * world.tileSideInPixels;
 			real32 maxX = minX + world.tileSideInPixels;
-			real32 maxY = minY + world.tileSideInPixels;
-			renderRectangle(backbuffer, minX, minY, maxX, maxY, gray, gray,
+			real32 maxY = minY - world.tileSideInPixels;
+			renderRectangle(backbuffer, minX, maxY, maxX, minY, gray, gray,
 							gray);
 		}
 	}
 
-	real32 playerLeft = world.tileSideInPixels * gameState->playerPos.tileX +
+	real32 playerLeft = world.lowerLeftX +
+						world.tileSideInPixels * gameState->playerPos.tileX +
 						world.metersToPixels * gameState->playerPos.tileRelX -
 						0.5f * world.metersToPixels * playerWidth;
-	real32 playerTop = world.tileSideInPixels * gameState->playerPos.tileY +
+	real32 playerRight = playerLeft + world.metersToPixels * playerWidth;
+
+	real32 playerTop = world.lowerLeftY -
+					   world.tileSideInPixels * gameState->playerPos.tileY -
 					   world.metersToPixels * gameState->playerPos.tileRelY -
 					   0.5f * world.metersToPixels * playerHeight;
-	real32 playerRight = playerLeft + world.metersToPixels * playerWidth;
 	real32 playerBottom = playerTop + world.metersToPixels * playerHeight;
+
 	renderRectangle(backbuffer, playerLeft, playerTop, playerRight,
 					playerBottom, playerR, playerG, playerB);
 }

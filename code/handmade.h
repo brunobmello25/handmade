@@ -154,6 +154,9 @@ struct World {
 	int32 height;
 	int32 tilemapWidth;
 	int32 tilemapHeight;
+
+	int32 lowerLeftX;
+	int32 lowerLeftY;
 };
 
 inline GameControllerInput *gameGetController(GameInput *input, size_t index) {
