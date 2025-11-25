@@ -27,7 +27,8 @@ cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$(pwd)/../install" \
     -DSDL_SHARED=ON \
-    -DSDL_STATIC=OFF
+    -DSDL_STATIC=OFF \
+    -DSDL_X11_XTEST=OFF
 
 cmake --build . --config Release -j$(nproc)
 cmake --install .

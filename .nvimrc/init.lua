@@ -1,6 +1,6 @@
 vim.keymap.set("n", "<M-m>", function()
 	-- vim.cmd("!bin/build && target/handmade")
-	vim.cmd("!BUILD_PLATFORM=1 USE_BEAR=1 bin/build")
+	vim.cmd("!BUILD_PLATFORM=1 USE_BEAR=1 bin/build sdl3-local")
 end, {})
 
 local build_augroup = vim.api.nvim_create_augroup("build", { clear = true })
