@@ -69,6 +69,49 @@ uint32 getTileUnchecked(World *world, Chunk *chunk, uint32 tileX,
 	return chunk->tiles[tileY * world->chunkSize + tileX];
 }
 
+uint32 getTileValue(World *world, Chunk *chunk, uint32 tileX, uint32 tileY) {
+	uint32 tileValue = 0;
+
+	if (chunk && tileX < world->chunkSize && tileY < world->chunkSize) {
+		tileValue = getTileUnchecked(world, chunk, tileX, tileY);
+	}
+
+	return tileValue;
+}
+
+ChunkPosition worldPosToChunkPos(World *world, WorldPosition worldPosition) {
+	ChunkPosition result = {};
+
+	result.chunkX = worldPosition.tileX >> world->chunkShift;
+	result.chunkY = worldPosition.tileY >> world->chunkShift;
+	result.tileX = worldPosition.tileX & world->chunkMask;
+	result.tileY = worldPosition.tileY & world->chunkMask;
+
+	return result;
+}
+
+Chunk *getChunk(World *world, ChunkPosition chunkPosition) {
+	// FIXME(bruno): only one chunk for now
+	Chunk *chunk = 0;
+
+	if (chunkPosition.chunkX == 0 && chunkPosition.chunkY == 0) {
+		chunk = &world->chunks[0];
+	}
+
+	return chunk;
+}
+
+uint32 getTileValueFromWorldPos(World *world, uint32 absTileX,
+								uint32 absTileY) {
+	ChunkPosition chunkPos = worldPosToChunkPos(
+		world, (WorldPosition){absTileX, absTileY, 0.0f, 0.0f});
+	Chunk *chunk = getChunk(world, chunkPos);
+	uint32 tileValue =
+		getTileValue(world, chunk, chunkPos.tileX, chunkPos.tileY);
+
+	return tileValue;
+}
+
 inline void recanonicalizeCoord(World *world, uint32 *tile,
 								real32 *tileOffset) {
 	// TODO(bruno): figure out a way to do this without division and
@@ -95,35 +138,23 @@ inline WorldPosition recanonicalizePosition(World *world,
 	return result;
 }
 
-ChunkPosition worldPosToChunkPos(World *world, WorldPosition worldPosition) {
-	ChunkPosition result = {};
-
-	result.chunkX = worldPosition.tileX >> world->chunkShift;
-	result.chunkY = worldPosition.tileY >> world->chunkShift;
-	result.tileX = worldPosition.tileX & world->chunkMask;
-	result.tileY = worldPosition.tileY & world->chunkMask;
-
-	return result;
-}
-
 bool isChunkPointEmpty(World *world, Chunk *chunk,
 					   ChunkPosition chunkPosition) {
-	uint32 tileID = getTileUnchecked(world, chunk, chunkPosition.tileX,
-									 chunkPosition.tileY);
+	uint32 tileID =
+		getTileValue(world, chunk, chunkPosition.tileX, chunkPosition.tileY);
 	return (tileID == 0);
-}
-
-Chunk *getChunk(World *world, ChunkPosition chunkPosition) {
-	// FIXME(bruno): only one chunk for now
-	assert(chunkPosition.chunkX == 0);
-	assert(chunkPosition.chunkY == 0);
-	return &world->chunks[0];
 }
 
 bool isWorldPointEmpty(World *world, WorldPosition pos) {
 	ChunkPosition chunkPosition = worldPosToChunkPos(world, pos);
 	Chunk *chunk = getChunk(world, chunkPosition);
-	return isChunkPointEmpty(world, chunk, chunkPosition);
+	bool isEmpty = true;
+
+	if (chunk) {
+		isEmpty = isChunkPointEmpty(world, chunk, chunkPosition);
+	}
+
+	return isEmpty;
 }
 
 void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
@@ -216,14 +247,19 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 					gameState); // TODO(bruno): Allow sample offsets
 								// here for more robust platform options
 
-	renderRectangle(backbuffer, 0, 0, backbuffer->width, backbuffer->height, 1,
-					0, 1);
+	renderRectangle(backbuffer, 0, 0, backbuffer->width, backbuffer->height,
+					1.0f, 0.0f, 0.1f);
 
-	Chunk chunk = world.chunks[0];
-	for (uint32 row = 0; row < world.chunkSize; row++) {
-		for (uint32 column = 0; column < world.chunkSize; column++) {
+	real32 centerX = 0.5f * (real32)backbuffer->width;
+	real32 centerY = 0.5f * (real32)backbuffer->height;
 
-			uint32 tileID = getTileUnchecked(&world, &chunk, column, row);
+	for (int32 relRow = -10; relRow < 10; relRow++) {
+		for (int32 relColumn = -20; relColumn < 20; relColumn++) {
+			uint32 column = gameState->playerPos.tileX + relColumn;
+			uint32 row = gameState->playerPos.tileY + relRow;
+
+			uint32 tileID = getTileValueFromWorldPos(&world, column, row);
+
 			real32 gray = 0.5f;
 			if (tileID == 1) {
 				gray = 1.0f;
@@ -236,8 +272,9 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 			}
 #endif
 
-			real32 minX = world.lowerLeftX + column * world.tileSideInPixels;
-			real32 minY = world.lowerLeftY - row * world.tileSideInPixels;
+			real32 minX =
+				centerX + ((real32)relColumn) * world.tileSideInPixels;
+			real32 minY = centerY - ((real32)relRow) * world.tileSideInPixels;
 			real32 maxX = minX + world.tileSideInPixels;
 			real32 maxY = minY - world.tileSideInPixels;
 			renderRectangle(backbuffer, minX, maxY, maxX, minY, gray, gray,
@@ -246,17 +283,14 @@ void gameUpdateAndRender(GameMemory *gameMemory, GameBackbuffer *backbuffer,
 	}
 
 	real32 playerLeft =
-		world.lowerLeftX + world.tileSideInPixels * gameState->playerPos.tileX +
-		world.metersToPixels * gameState->playerPos.tileOffsetX -
+		centerX + world.metersToPixels * gameState->playerPos.tileOffsetX -
 		0.5f * world.metersToPixels * playerWidth;
-	real32 playerRight = playerLeft + world.metersToPixels * playerWidth;
-
-	real32 playerTop = world.lowerLeftY -
-					   world.tileSideInPixels * gameState->playerPos.tileY -
+	real32 playerTop = centerY -
 					   world.metersToPixels * gameState->playerPos.tileOffsetY -
-					   0.5f * world.metersToPixels * playerHeight;
-	real32 playerBottom = playerTop + world.metersToPixels * playerHeight;
+					   world.metersToPixels * playerHeight;
 
-	renderRectangle(backbuffer, playerLeft, playerTop, playerRight,
-					playerBottom, playerR, playerG, playerB);
+	renderRectangle(backbuffer, playerLeft, playerTop,
+					playerLeft + world.metersToPixels * playerWidth,
+					playerTop + world.metersToPixels * playerHeight, playerR,
+					playerG, playerB);
 }
